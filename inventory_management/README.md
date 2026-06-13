@@ -158,6 +158,12 @@ Run the API plus GUI:
 docker compose --profile gui up --build
 ```
 
+Compose knobs:
+
+- `SOURCE_DATA_PATH`: host data directory, default `./data`.
+- `API_HOST_PORT`: host exposed port for api, default `5000`.
+- `WEB_HOST_PORT`: host exposed port for gui, default `5001`.
+
 
 ### &ensp;&ensp;Python
 
