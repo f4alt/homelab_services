@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "todo-sync-server"
+version = "0.1.0"
+description = "Lightweight orgmode-style todo file and CalDAV sync server."
+requires-python = ">=3.11"
+dependencies = [
+    "Flask>=3.0,<4",
+    "flask-cors>=4.0,<7",
+    "icalendar>=7.1,<8",
+    "python-dotenv>=1.0,<2",
+    "requests>=2.31,<3",
+]
+
+[project.scripts]
+todo-sync = "todo_sync.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["todo_sync*"]

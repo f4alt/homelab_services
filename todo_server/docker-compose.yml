@@ -1,0 +1,87 @@
+services:
+  radicale_cert:
+    build:
+      context: ./radicale/cert-init
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      RADICALE_CERT_DIR: /certs
+      RADICALE_CERT_DAYS: ${RADICALE_CERT_DAYS:-825}
+      RADICALE_CERT_RENEW_BEFORE_DAYS: ${RADICALE_CERT_RENEW_BEFORE_DAYS:-30}
+      RADICALE_CERT_CHECK_INTERVAL_SECONDS: ${RADICALE_CERT_CHECK_INTERVAL_SECONDS:-172800}
+      RADICALE_CERT_COMMON_NAME: ${RADICALE_CERT_COMMON_NAME:-radicale.local}
+      RADICALE_CERT_EXTRA_SANS: ${RADICALE_CERT_EXTRA_SANS:-}
+    healthcheck:
+      test: ["CMD", "generate-cert", "--check"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./radicale/generated-certs:/certs
+    command: ["generate-cert", "--watch"]
+
+  radicale:
+    image: tomsquest/docker-radicale:latest
+    restart: unless-stopped
+    depends_on:
+      radicale_cert:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://127.0.0.1:5232/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    ports:
+      - "5232:5232"
+    volumes:
+      - ./radicale/config:/config/config:ro
+      - ./radicale/users:/config/users:ro
+      - ./radicale/generated-certs:/config/certs:ro
+      - radicale_data:/data
+
+  todo_api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - radicale
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TODO_DIRECTORY: /data/todo_files
+      SYNC_STATE_FILE: /data/todo_files/.todo-sync-state.json
+      CALDAV_URL: https://radicale:5232/
+      CALDAV_VERIFY_SSL: "false"
+      CALDAV_USERNAME: ${CALDAV_USERNAME:-todo}
+      CALDAV_PASSWORD: ${CALDAV_PASSWORD:-todo}
+      CALDAV_COLLECTION_PREFIX: ${CALDAV_COLLECTION_PREFIX:-}
+      API_HOST: 0.0.0.0
+      API_PORT: 5000
+    ports:
+      - "5000:5000"
+    volumes:
+      - ${TODO_FILES_HOST_PATH:-../todo_files}:/data/todo_files
+    command: ["todo-sync", "serve"]
+
+  todo_sync_worker:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - radicale
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TODO_DIRECTORY: /data/todo_files
+      SYNC_STATE_FILE: /data/todo_files/.todo-sync-state.json
+      CALDAV_URL: https://radicale:5232/
+      CALDAV_VERIFY_SSL: "false"
+      CALDAV_USERNAME: ${CALDAV_USERNAME:-todo}
+      CALDAV_PASSWORD: ${CALDAV_PASSWORD:-todo}
+      CALDAV_COLLECTION_PREFIX: ${CALDAV_COLLECTION_PREFIX:-}
+    volumes:
+      - ${TODO_FILES_HOST_PATH:-../todo_files}:/data/todo_files
+    command: ["todo-sync", "sync", "--watch", "--interval", "${SYNC_INTERVAL_SECONDS:-300}"]
+
+volumes:
+  radicale_data:

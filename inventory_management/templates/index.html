@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory Manager</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div>
+    <button id="toggleFormBtn" aria-label="Show create item form">+</button>
+    <div id="createSection" class="hidden">
+      <h2>Add New Item</h2>
+      <form id="createForm">
+        <input type="text" id="name" placeholder="Name" required />
+        <input type="number" id="qnty" placeholder="Quantity" required />
+        <input type="text" id="location" placeholder="Location" />
+        <input type="text" id="tags" placeholder="Tags (comma-separated)" />
+        <button type="submit">Create Item</button>
+      </form>
+    </div>
+    <div class="search-container" id="searchContainer">
+      <input type="text" id="searchInput" placeholder="Where is my..." aria-label="Search inventory">
+      <p id="statusMessage" class="status-message hidden" role="status"></p>
+      <div class="results-container" id="resultsContainer">
+        <!-- Results will populate here -->
+      </div>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

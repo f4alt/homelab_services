@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard Config Editor</title>
+  <link rel="stylesheet" href="/platform/global.css" />
+  <style>
+    body {
+      min-height: 100vh;
+      padding: var(--grid-gap);
+    }
+
+    .editor {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+      margin: 0 auto;
+      max-width: var(--grid-width);
+    }
+
+    .editor-toolbar {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .editor-button,
+    .editor-link {
+      background: var(--tile);
+      border: 1px solid var(--tile-border);
+      border-radius: 8px;
+      color: var(--fg);
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+      line-height: 1;
+      padding: 9px 11px;
+      text-decoration: none;
+    }
+
+    .editor-button:hover,
+    .editor-button:focus-visible,
+    .editor-link:hover,
+    .editor-link:focus-visible {
+      border-color: var(--clickable-hover-border);
+    }
+
+    .editor-source {
+      background: #080a0e;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      color: var(--fg);
+      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      min-height: calc(100vh - 170px);
+      outline: none;
+      padding: 12px;
+      resize: vertical;
+      tab-size: 2;
+      width: 100%;
+    }
+
+    .editor-status {
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <main class="editor">
+    <section class="widget">
+      <div class="label">Dashboard config editor</div>
+      <div class="label-info">Edits save directly to dashboard/config.js on this LAN-local instance.</div>
+      <div class="editor-toolbar">
+        <button class="editor-button" type="button" id="reset">Reset from Saved Config</button>
+        <button class="editor-button" type="button" id="save">Save</button>
+      </div>
+      <div class="label-info editor-status" id="status">Ready.</div>
+    </section>
+
+    <textarea class="editor-source" id="source" spellcheck="false"></textarea>
+  </main>
+
+  <script>
+    const source = document.getElementById("source");
+    const status = document.getElementById("status");
+    const buttons = {
+      reset: document.getElementById("reset"),
+      save: document.getElementById("save")
+    };
+
+    function setStatus(message, ok = true) {
+      status.textContent = message;
+      status.style.color = ok ? "var(--label-info)" : "var(--err)";
+    }
+
+    function setBusy(busy) {
+      for (const button of Object.values(buttons)) {
+        button.disabled = busy;
+      }
+    }
+
+    async function readJson(response) {
+      const text = await response.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        return {
+          ok: false,
+          error: {
+            message: text || `HTTP ${response.status}`
+          }
+        };
+      }
+    }
+
+    function formatValidation(payload, prefix) {
+      const warnings = payload?.data?.warnings || [];
+      const warningText = warnings.length ? `\nWarnings:\n- ${warnings.join("\n- ")}` : "";
+      return `${prefix}${warningText}`;
+    }
+
+    async function resetConfig() {
+      setBusy(true);
+      setStatus("Resetting from saved config...");
+      try {
+        const response = await fetch("/api/config", { headers: { Accept: "application/javascript" } });
+        const text = await response.text();
+        if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+        source.value = text;
+        setStatus("Reset from saved dashboard/config.js.");
+      } catch (err) {
+        setStatus(`Reset failed: ${err.message || err}`, false);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function saveConfig() {
+      setBusy(true);
+      setStatus("Validating and saving config...");
+      try {
+        const response = await fetch("/api/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ source: source.value })
+        });
+        const payload = await readJson(response);
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload?.error?.details?.errors?.join("\n") || payload?.error?.message || "Save failed.");
+        }
+        setStatus(formatValidation(payload, "Saved dashboard/config.js. Returning to dashboard..."));
+        window.location.assign("/");
+      } catch (err) {
+        setStatus(`Save failed:\n${err.message || err}`, false);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    buttons.reset.addEventListener("click", resetConfig);
+    buttons.save.addEventListener("click", saveConfig);
+    resetConfig();
+  </script>
+</body>
+</html>

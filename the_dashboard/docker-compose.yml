@@ -1,0 +1,88 @@
+networks:
+  dashnet:
+    driver: bridge
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: dash-nginx
+    restart: unless-stopped
+    ports:
+      - "${DASHBOARD_HTTP_PORT:-8080}:80"
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /var/tmp
+    volumes:
+      - ./dashboard:/usr/share/nginx/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks: [dashnet]
+    depends_on: [gateway]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # Bypass the default entrypoint scripts that print IPv6/config notices
+    entrypoint: ["nginx", "-g", "daemon off;"]
+
+  gateway:
+    build:
+      context: ./gateway
+    container_name: dash-gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: "production"
+      GATEWAY_UPSTREAM_TIMEOUT_MS: "${GATEWAY_UPSTREAM_TIMEOUT_MS:-5000}"
+      TODO_API_BASE_URL: "${TODO_API_BASE_URL:-http://host.docker.internal:5000}"
+      STATUS_PROBE_TIMEOUT_MS: "${STATUS_PROBE_TIMEOUT_MS:-5000}"
+      STATUS_PROBE_MAX_TARGETS: "${STATUS_PROBE_MAX_TARGETS:-100}"
+      STATUS_PROBE_CONCURRENCY: "${STATUS_PROBE_CONCURRENCY:-10}"
+      STATUS_PROBE_ALLOWED_HOSTS: "${STATUS_PROBE_ALLOWED_HOSTS:-localhost}"
+    read_only: true
+    tmpfs:
+      - /tmp
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./dashboard:/dashboard:rw
+    expose: ["3000"]
+    networks: [dashnet]
+    depends_on: [netstats]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  netstats:
+    build:
+      context: ./netstats
+    container_name: dash-netstats
+    restart: unless-stopped
+    environment:
+      NODE_ENV: "production"
+      PING_TARGET: "${NETSTATS_PING_TARGET:-8.8.8.8}"
+    read_only: true
+    tmpfs:
+      - /tmp
+    expose: ["4000"]
+    networks: [dashnet]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

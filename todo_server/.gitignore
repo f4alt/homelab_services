@@ -1,0 +1,13 @@
+.env
+*.env
+!example.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+radicale/generated-certs/*
+!radicale/generated-certs/.gitkeep
+radicale/certs/*

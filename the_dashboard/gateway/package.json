@@ -1,0 +1,13 @@
+{
+  "name": "dashboard-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "gateway.js",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "express": "^4.19.2",
+    "luxon": "^3.7.1"
+  }
+}

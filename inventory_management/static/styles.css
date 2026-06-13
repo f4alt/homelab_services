@@ -1,0 +1,304 @@
+/* ===== Base resets ===== */
+* { margin: 0; padding: 0; }
+.hidden { display: none !important; }
+input[type=number],
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button {
+  /* hide number input up/down arrows */
+  -webkit-appearance: none; 
+  margin: 0; 
+  -moz-appearance: textfield;
+}
+
+/* ===== Color palette ===== */
+:root {
+  --background-color: #121212;
+  --background-secondary: #1e1e1e;
+  --background-tertiary: #333;
+  --text-color: #e0e0e0;
+  --highlight-shadow: 0 0 25px rgba(130,137,118,.7);
+  --tile-color: #7d7689;
+  --tile-x-button: #e57373;
+  --tile-action-button: #d3ffc8;
+
+  --padding-min: 3px;
+  --padding-generic: 10px;
+  --border-radius: 10px;
+
+  --abs-top-margin: 15px;
+
+  --tile-btn-offset: 8px;
+}
+
+body {
+  font-family: system-ui;
+  background: var(--background-color);
+  color: var(--text-color);
+}
+
+/* General form/button/input styles */
+button, input {
+  background: var(--background-secondary);
+  color: var(--text-color);
+  border: none;
+  font-size: inherit;
+  /*border: 1px solid var(--background-tertiary);*/
+  /*padding: 8px;*/
+  /*margin: 4px 0;*/
+  /*border-radius: 10px;*/
+  /*width: 100%;*/
+}
+
+/***** Show / Hide new entry form *****/
+#toggleFormBtn {
+  position: absolute;
+  top: var(--abs-top-margin);
+  right: var(--abs-top-margin);
+  aspect-ratio: 1/1;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-color);
+  opacity: 50%;               /* starting opacity 50% */
+  font-size: 4rem;
+  width: 4rem;
+  padding: var(--padding-generic);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+#toggleFormBtn:hover,
+#toggleFormBtn.form-open {
+  opacity: 100%;
+  outline: none;
+  box-shadow: var(--highlight-shadow);
+  background-color: var(--background-tertiary);
+}
+
+/***** Search Bar + Results *****/
+.search-container {
+  position: absolute;
+  left: 50%;
+  top: 50%;                           /* starting position in middle of screen */
+  width: 40vw;
+  transform: translate(-50%, -50%);   /* center */
+  transition: top 0.5s cubic-bezier(.77,0,.18,1), transform 0.5s cubic-bezier(.77,0,.18,1);
+  z-index: 100;
+}
+.search-container.active {
+  top: var(--abs-top-margin);         /* move to top of screen when active */
+  transform: translate(-50%, 0);
+}
+
+#searchInput {
+  width: 100%;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.4rem;
+  border-radius: 2rem;
+}
+
+#searchInput:focus {
+  outline: none;
+  box-shadow: var(--highlight-shadow);
+}
+
+.results-container {
+  display: none;            /*  hide unless we're active */
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 75vw;
+  z-index: 90;
+  list-style: none;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: var(--padding-generic);
+}
+#resultsContainer.active {
+  display: grid;
+}
+
+.status-message {
+  margin-top: 0.75rem;
+  text-align: center;
+  color: var(--tile-action-button);
+}
+
+.status-message.error {
+  color: var(--tile-x-button);
+}
+
+/* Grid Item / Tile Styling */
+.tile {
+  background: var(--background-secondary);
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 3px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  cursor: default;
+  text-align: center;
+}
+.tile input,
+.tile span {
+  background-color: var(--background-tertiary);
+  /*width: 100%;*/
+  padding: var(--padding-min);
+  margin: 2px;
+  text-align: center;
+  cursor: auto;
+  border-radius: var(--border-radius);
+  justify-content: center;
+  height: auto;
+  width: auto;
+}
+.tile.not-editable span {
+  background-color: transparent;
+  cursor: default;
+}
+.tile.not-editable .update-btn {
+  /*display: none;*/
+}
+.editable-span {
+  font-size: 2rem;
+}
+.tile-header {
+  font-weight: bold;
+  display: block;
+  /*align-items: center;*/
+  text-align: center;
+  font-size: 2.6rem;
+  padding: 0 12%;
+}
+.tile-header.editable {
+  display: flex;
+}
+.tile-name {
+  /*max-width: 7rem;*/
+}
+.tile-x-btn, .tile-action-btn {
+  /*border: none;*/
+  font-size: 0.8rem;
+  line-height: 1;
+  position: absolute;
+  top: var(--tile-btn-offset);
+  background-color: var(--background-tertiary);
+  border-radius: 40%;
+  cursor: pointer;
+  padding: 2%;
+  aspect-ratio: 1/1;
+  min-width: 2.2rem;
+}
+.tile-x-btn {
+  color: var(--tile-x-button);
+  left: var(--tile-btn-offset);
+}
+.tile-action-btn { 
+  color: var(--tile-action-button);
+  right: var(--tile-btn-offset);
+}
+.tile .location {
+  font-size: 1.6rem;
+  color: var(--tile-color);
+  margin-bottom: 2%;
+}
+.tags {
+  font-size: 1.5rem;
+  width: 100%;
+  height: 4rem;
+  overflow: hidden;
+}
+.tags.show-overflowed-tags {
+  height: 100%;
+}
+.tags span.tag {
+  background-color: var(--background-tertiary);
+  margin: var(--padding-min);
+  display: inline-block;
+  padding: var(--padding-generic);
+  border-radius: var(--border-radius);
+}
+.autosize-input {
+  font-size: 2rem;
+}
+
+/* Responsive fallback */
+@media (max-width: 600px) {
+  .search-container,
+  .results-container {
+    width: 90vw;
+    min-width: 0;
+  }
+
+  #searchInput {
+    box-sizing: border-box;
+    font-size: 1.1rem;
+    padding: 0.85rem 1rem;
+  }
+
+  .tile-header {
+    font-size: 2rem;
+  }
+
+  .editable-span {
+    font-size: 1.4rem;
+  }
+}
+@media (min-width: 900px) {
+  .results-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+
+/* add new item */
+#createSection {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 101;
+  background-color: var(--background-tertiary);
+  /*align-content: center;*/
+  padding: var(--padding-generic);
+  border-radius: var(--border-radius);
+  /*display: flex;*/
+  /*flex-direction: column;*/
+}
+#createSection h2 {
+  background-color: var(--tile-color);
+  font-size: 3rem;
+  width: max-content;
+  padding: var(--padding-generic);
+  border-radius: var(--border-radius);
+  margin: 0px auto 2rem auto;
+  cursor: default;
+}
+
+#createForm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--padding-min);
+  font-size: 3rem;
+  
+}
+#createForm button {
+  padding: var(--padding-min);
+  border-radius: var(--border-radius);
+  background-color: var(--background-color);
+  margin-top: 2rem;
+}
+#createForm button:hover {
+  box-shadow: var(--highlight-shadow);
+  cursor: pointer;
+}
+#createForm input {
+  border-radius: var(--border-radius);
+  padding: var(--padding-min);
+}
