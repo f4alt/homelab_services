@@ -158,6 +158,44 @@ class SyncServiceTest(unittest.TestCase):
             self.assertEqual(remote.puts[0][0].status, "TODO")
             self.assertIn("* TODO Reopen me\n", (directory / "home.org").read_text(encoding="utf-8"))
 
+    def test_empty_remote_does_not_mass_delete_existing_local_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            state_file = directory / ".state.json"
+            uid = "same-uid"
+            task = Task(1, "TODO", "Keep me", "home.org", uid=uid, collection="home")
+            (directory / "home.org").write_text(
+                "* TODO Keep me\n"
+                ":PROPERTIES:\n"
+                f":CALDAV_UID: {uid}\n"
+                ":END:\n",
+                encoding="utf-8",
+            )
+            state_file.write_text(
+                json.dumps(
+                    {
+                        "records": {
+                            uid: {
+                                "local_hash": task.content_hash(),
+                                "remote_hash": task.content_hash(),
+                                "remote_etag": "old-etag",
+                                "source_file": "home.org",
+                                "collection": "home",
+                            }
+                        },
+                        "tombstones": {},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            remote = FakeRemoteStore([])
+            settings = Settings(todo_directory=directory, sync_state_file=state_file)
+
+            FakeSyncService(settings, remote).run_once()
+
+            self.assertEqual(remote.puts[0][0].uid, uid)
+            self.assertIn("* TODO Keep me\n", (directory / "home.org").read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

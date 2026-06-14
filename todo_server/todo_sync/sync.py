@@ -115,6 +115,7 @@ class SyncService:
         local_tasks = [task for tasks in local_by_file.values() for task in tasks if task.uid]
         local = {task.uid: task for task in local_tasks}
         remote = {task.uid: task for task in remote_tasks if task.uid}
+        preserve_local_when_remote_empty = bool(local) and not remote and bool(state.records)
 
         for uid in sorted(set(local) | set(remote) | set(state.records)):
             if uid in state.tombstones and uid not in local and uid not in remote:
@@ -127,7 +128,15 @@ class SyncService:
             if local_task and remote_task:
                 self._sync_existing(uid, local_task, remote_task, previous, local_files, remote_store, state)
             elif local_task:
-                self._sync_local_only(uid, local_task, previous, remote_store, local_files, state)
+                self._sync_local_only(
+                    uid,
+                    local_task,
+                    previous,
+                    remote_store,
+                    local_files,
+                    state,
+                    preserve_local_when_remote_empty,
+                )
             elif remote_task:
                 self._sync_remote_only(uid, remote_task, previous, local_files, remote_store, state)
             elif previous:
@@ -174,9 +183,15 @@ class SyncService:
 
         state.record(local_task, remote_task.meta.get("etag"))
 
-    def _sync_local_only(self, uid, local_task, previous, remote_store, local_files, state):
+    def _sync_local_only(self, uid, local_task, previous, remote_store, local_files, state, preserve_local=False):
         if previous is None:
             remote_store.put_task(local_task)
+            local_task.meta["remote_hash"] = local_task.content_hash()
+            state.record(local_task, local_task.meta.get("etag"))
+            return
+
+        if preserve_local:
+            remote_store.put_task(local_task, previous.get("remote_etag"))
             local_task.meta["remote_hash"] = local_task.content_hash()
             state.record(local_task, local_task.meta.get("etag"))
             return
