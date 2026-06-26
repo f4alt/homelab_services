@@ -1,0 +1,12 @@
+services:
+  syncthing:
+    image: syncthing/syncthing:latest
+    restart: unless-stopped
+    ports:
+      - "${SYNCTHING_GUI_HOST_PORT:-8384}:8384"
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+      - "21027:21027/udp"
+    volumes:
+      - "${SYNCTHING_CONFIG_HOST_PATH:-./config}:/var/syncthing/config"
+      - "${SYNCTHING_SOURCE_HOST_PATH:-./source}:/var/syncthing/Sync"
