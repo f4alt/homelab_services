@@ -3,7 +3,7 @@ import os
 import sqlite3
 from contextlib import closing
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 from rapidfuzz import fuzz
 
 
@@ -20,16 +20,10 @@ class ApiError(Exception):
         self.details = details or []
 
 
-def create_app(db_path=None, initialize=True):
+def create_app(db_path=None):
     app = Flask(__name__)
     app.config["DB_PATH"] = db_path or os.environ.get("DB_PATH", DEFAULT_DB_PATH)
-    app.config["DB_INITIALIZED"] = False
-
-    @app.before_request
-    def ensure_db_initialized():
-        if not app.config["DB_INITIALIZED"]:
-            init_db(app.config["DB_PATH"])
-            app.config["DB_INITIALIZED"] = True
+    init_db(app.config["DB_PATH"])
 
     @app.errorhandler(ApiError)
     def handle_api_error(error):
@@ -62,6 +56,10 @@ def create_app(db_path=None, initialize=True):
             500,
         )
 
+    @app.get("/")
+    def index():
+        return render_template("index.html")
+
     @app.route("/items", methods=["POST"])
     def create_item():
         data = get_json_body()
@@ -93,7 +91,7 @@ def create_app(db_path=None, initialize=True):
 
         items = [serialize_item(row) for row in rows]
         if query is not None:
-            items = search_items(items, query.strip())
+            items = search_items(items, query)
         return jsonify({"items": items, "count": len(items)})
 
     @app.route("/items/<int:item_id>", methods=["GET"])
@@ -139,9 +137,6 @@ def create_app(db_path=None, initialize=True):
 
         return jsonify({"message": "deleted", "id": item_id})
 
-    if initialize:
-        init_db(app.config["DB_PATH"])
-        app.config["DB_INITIALIZED"] = True
     return app
 
 
@@ -263,18 +258,11 @@ def fetch_item_or_404(db_path, item_id):
 
 
 def search_items(items, query):
+    query = query.strip().lower()
     if query == "*":
         return items
     if not query:
         return []
-
-    normalized_query = query.lower()
-    return [item for item in items if item_matches(item, normalized_query)]
-
-
-def item_matches(item, query):
-    fields = [item.get("object_name", ""), item.get("location", "")]
-    fields.extend(item.get("category_tags", []))
 
     if len(query) < 3:
         threshold = 60
@@ -286,19 +274,20 @@ def item_matches(item, query):
         threshold = 88
         scorer = fuzz.ratio
 
-    for field in fields:
-        value = str(field).lower()
-        if not value:
-            continue
-        if query in value or scorer(query, value) >= threshold:
-            return True
-    return False
+    matches = []
+    for item in items:
+        fields = [item.get("object_name", ""), item.get("location", "")]
+        fields.extend(item.get("category_tags", []))
 
+        for field in fields:
+            value = str(field).lower()
+            if value and (query in value or scorer(query, value) >= threshold):
+                matches.append(item)
+                break
 
-app = create_app(initialize=False)
+    return matches
 
 
 if __name__ == "__main__":
-    init_db(app.config["DB_PATH"])
-    app.config["DB_INITIALIZED"] = True
+    app = create_app()
     app.run(host="0.0.0.0", port=int(os.environ.get("API_PORT", "5000")))

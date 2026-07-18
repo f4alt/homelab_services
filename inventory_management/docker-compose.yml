@@ -11,17 +11,3 @@ services:
     volumes:
       - ${SOURCE_DATA_PATH:-./data}:/data
     command: ["python", "api.py"]
-
-  gui:
-    image: inventory-manager
-    container_name: inventory-manager-gui
-    profiles:
-      - gui
-    depends_on:
-      - api
-    environment:
-      API_URL: http://api:5000
-      WEB_PORT: 5001
-    ports:
-      - ${WEB_HOST_PORT:-5001}:5001
-    command: ["python", "web.py"]

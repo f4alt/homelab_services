@@ -42,11 +42,6 @@ button, input {
   color: var(--text-color);
   border: none;
   font-size: inherit;
-  /*border: 1px solid var(--background-tertiary);*/
-  /*padding: 8px;*/
-  /*margin: 4px 0;*/
-  /*border-radius: 10px;*/
-  /*width: 100%;*/
 }
 
 /***** Show / Hide new entry form *****/
@@ -144,10 +139,8 @@ button, input {
   cursor: default;
   text-align: center;
 }
-.tile input,
 .tile span {
   background-color: var(--background-tertiary);
-  /*width: 100%;*/
   padding: var(--padding-min);
   margin: 2px;
   text-align: center;
@@ -161,28 +154,17 @@ button, input {
   background-color: transparent;
   cursor: default;
 }
-.tile.not-editable .update-btn {
-  /*display: none;*/
-}
 .editable-span {
   font-size: 2rem;
 }
 .tile-header {
   font-weight: bold;
   display: block;
-  /*align-items: center;*/
   text-align: center;
   font-size: 2.6rem;
   padding: 0 12%;
 }
-.tile-header.editable {
-  display: flex;
-}
-.tile-name {
-  /*max-width: 7rem;*/
-}
 .tile-x-btn, .tile-action-btn {
-  /*border: none;*/
   font-size: 0.8rem;
   line-height: 1;
   position: absolute;
@@ -223,10 +205,6 @@ button, input {
   padding: var(--padding-generic);
   border-radius: var(--border-radius);
 }
-.autosize-input {
-  font-size: 2rem;
-}
-
 /* Responsive fallback */
 @media (max-width: 600px) {
   .search-container,
@@ -264,11 +242,8 @@ button, input {
   transform: translate(-50%, -50%);
   z-index: 101;
   background-color: var(--background-tertiary);
-  /*align-content: center;*/
   padding: var(--padding-generic);
   border-radius: var(--border-radius);
-  /*display: flex;*/
-  /*flex-direction: column;*/
 }
 #createSection h2 {
   background-color: var(--tile-color);

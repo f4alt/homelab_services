@@ -3,17 +3,23 @@
 ////////////////////////////////////////////
 const statusMessage = document.getElementById('statusMessage');
 
-async function requestJson(url, options = {}) {
+async function requestJson(method, url, data) {
+  const options = { method };
+  if (data !== undefined) {
+    options.headers = { 'Content-Type': 'application/json' };
+    options.body = JSON.stringify(data);
+  }
+
   const response = await fetch(url, options);
-  const data = await response.json().catch(() => ({}));
+  const responseData = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const message = data.error?.message || 'Request failed';
-    const details = data.error?.details ? `: ${data.error.details.join(', ')}` : '';
+    const message = responseData.error?.message || 'Request failed';
+    const details = responseData.error?.details ? `: ${responseData.error.details.join(', ')}` : '';
     throw new Error(message + details);
   }
 
-  return data;
+  return responseData;
 }
 
 function setStatus(message, isError = false) {
@@ -23,22 +29,11 @@ function setStatus(message, isError = false) {
 }
 
 const API = {
-  search: q => requestJson('/search?q=' + encodeURIComponent(q)).then(data => data.items || []),
-  create: data => requestJson('/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }),
-  update: data => requestJson('/update', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }),
-  del: id => requestJson('/delete', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id })
-  })
+  search: q => requestJson('GET', '/items?q=' + encodeURIComponent(q))
+    .then(data => data.items || []),
+  create: data => requestJson('POST', '/items', data),
+  update: ({ id, ...data }) => requestJson('PUT', `/items/${id}`, data),
+  del: id => requestJson('DELETE', `/items/${id}`)
 };
 
 ////////////////////////////////////////////
@@ -96,10 +91,6 @@ searchInput.addEventListener('input', function () {
     setStatus('');
   }
 });
-
-searchContainer.classList.remove('active');
-resultsContainer.classList.remove('active');
-resultsContainer.textContent = '';
 
 ////////////////////////////////////////////
 // Tile functions

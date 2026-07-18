@@ -1,6 +1,6 @@
 # Inventory Management
 
-A small inventory project with a Flask API backed by SQLite and an optional lightweight web GUI.
+A small inventory project with a Flask API backed by SQLite. The API is the primary interface, with an optional lightweight debug GUI served by the same process.
 
 By default, data is stored in `data/inventory.db`
 
@@ -72,7 +72,7 @@ Error responses:
 }
 ```
 
-Current API error codes include `bad_request`, `not_found`, `method_not_allowed`, and `internal_error`. The optional GUI proxy can also return `api_unavailable`.
+Current API error codes include `bad_request`, `not_found`, `method_not_allowed`, and `internal_error`.
 
 #### Endpoints
 ##### GET
@@ -146,23 +146,16 @@ Current API error codes include `bad_request`, `not_found`, `method_not_allowed`
 
 ### &ensp;&ensp;Docker
 
-Run with Docker Compose (default just starts the API):
+Run with Docker Compose:
 
 ```sh
-docker compose up --build api
-```
-
-Run the API plus GUI:
-
-```sh
-docker compose --profile gui up --build
+docker compose up --build
 ```
 
 Compose knobs:
 
 - `SOURCE_DATA_PATH`: host data directory, default `./data`.
 - `API_HOST_PORT`: host exposed port for api, default `5000`.
-- `WEB_HOST_PORT`: host exposed port for gui, default `5001`.
 
 
 ### &ensp;&ensp;Python
@@ -179,11 +172,7 @@ Start the API (default `http://localhost:5000`):
 python api.py
 ```
 
-Start the optional GUI in a second terminal (default `http://localhost:5001`):
-
-```sh
-API_URL=http://127.0.0.1:5000 python web.py
-```
+The optional debug GUI is available at `http://localhost:5000/`. It is served on demand by the API process and does not require a separate service.
 
 Run the API tests:
 

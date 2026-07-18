@@ -1,4 +1,6 @@
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -24,6 +26,35 @@ class InventoryApiTest(unittest.TestCase):
         }
         payload.update(overrides)
         return self.client.post("/items", json=payload)
+
+    def test_root_serves_debug_interface(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Inventory Manager", response.data)
+        self.assertIn(b"/static/app.js", response.data)
+
+    def test_app_creation_initializes_its_configured_database(self):
+        self.assertTrue(os.path.exists(self.db_path))
+
+    def test_import_does_not_initialize_a_database(self):
+        project_dir = os.path.dirname(os.path.dirname(__file__))
+        environment = os.environ.copy()
+        environment["PYTHONPATH"] = project_dir
+
+        with tempfile.TemporaryDirectory() as working_dir:
+            configured_db_path = os.path.join(working_dir, "configured.db")
+            environment["DB_PATH"] = configured_db_path
+            result = subprocess.run(
+                [sys.executable, "-c", "import api"],
+                cwd=working_dir,
+                env=environment,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(os.path.exists(configured_db_path))
 
     def test_create_get_list_update_delete_item(self):
         create_response = self.create_item()
@@ -121,6 +152,31 @@ class InventoryApiTest(unittest.TestCase):
 
         all_response = self.client.get("/items?q=*")
         self.assertEqual(all_response.get_json()["count"], 2)
+
+    def test_search_preserves_normalization_fuzzy_thresholds_and_ordering(self):
+        self.create_item(object_name="Hammer", location="Garage", category_tags=["tools"])
+        self.create_item(object_name="Flour", location="Pantry", category_tags=["baking"])
+
+        normalized_response = self.client.get("/items", query_string={"q": " HaMr "})
+        self.assertEqual(
+            [item["object_name"] for item in normalized_response.get_json()["items"]],
+            ["Hammer"],
+        )
+
+        short_fuzzy_response = self.client.get("/items", query_string={"q": "hm"})
+        self.assertEqual(short_fuzzy_response.get_json()["count"], 1)
+
+        long_fuzzy_response = self.client.get("/items", query_string={"q": "hammre"})
+        self.assertEqual(long_fuzzy_response.get_json()["count"], 0)
+
+        wildcard_response = self.client.get("/items", query_string={"q": " * "})
+        self.assertEqual(
+            [item["object_name"] for item in wildcard_response.get_json()["items"]],
+            ["Flour", "Hammer"],
+        )
+
+        empty_response = self.client.get("/items", query_string={"q": "  "})
+        self.assertEqual(empty_response.get_json(), {"items": [], "count": 0})
 
 
 if __name__ == "__main__":
