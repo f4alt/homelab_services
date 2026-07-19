@@ -7,6 +7,16 @@ from todo_sync.org_files import LocalFiles, TodoFile, collection_slug
 
 
 class TodoFileTest(unittest.TestCase):
+    def test_construction_does_not_create_or_parse_a_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "home.org"
+
+            todo_file = TodoFile(path)
+
+            self.assertFalse(path.exists())
+            self.assertEqual(todo_file.get_tasks(), [])
+            self.assertTrue(path.exists())
+
     def test_loads_simple_org_headings_and_creates_uid_drawer(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "home.org"
@@ -154,6 +164,16 @@ class TodoFileTest(unittest.TestCase):
 
 
 class LocalFilesTest(unittest.TestCase):
+    def test_construction_does_not_create_or_scan_the_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "todos"
+
+            local_files = LocalFiles(directory)
+
+            self.assertFalse(directory.exists())
+            self.assertEqual(local_files.get_tasks(), [])
+            self.assertTrue(directory.exists())
+
     def test_scans_all_org_files_including_master_as_ordinary_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
@@ -164,6 +184,22 @@ class LocalFilesTest(unittest.TestCase):
             tasks = LocalFiles(directory).get_tasks()
 
             self.assertEqual({task.source_file for task in tasks}, {"home.org", "master.org"})
+
+    def test_public_reads_rescan_files_and_contents(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            home = directory / "home.org"
+            home.write_text("* TODO First\n", encoding="utf-8")
+            local_files = LocalFiles(directory)
+            self.assertEqual([task.content for task in local_files.get_tasks()], ["First"])
+
+            home.write_text("* TODO Edited\n", encoding="utf-8")
+            (directory / "work.org").write_text("* TODO Added\n", encoding="utf-8")
+
+            self.assertEqual(
+                {task.content for task in local_files.get_tasks()},
+                {"Edited", "Added"},
+            )
 
     def test_collection_slug_is_stable_for_nested_files(self):
         self.assertEqual(collection_slug("Work/Client Todos.org"), "work-client-todos")

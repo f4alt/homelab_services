@@ -6,14 +6,9 @@ from urllib.parse import urljoin
 
 import requests
 import urllib3
+from urllib3.exceptions import InsecureRequestWarning
 
-from .models import Task
 from .vtodo import task_from_ical, task_to_ical
-
-try:
-    from urllib3.exceptions import InsecureRequestWarning
-except ImportError:  # pragma: no cover
-    InsecureRequestWarning = None
 
 
 def safe_collection_slug(prefix, slug):
@@ -26,14 +21,13 @@ class CalDavStore:
     def __init__(self, base_url, username, password, collection_prefix="", verify_ssl=True, timeout=20):
         self.base_url = base_url if base_url.endswith("/") else f"{base_url}/"
         self.username = username
-        self.password = password
         self.collection_prefix = collection_prefix
         self.verify_ssl = verify_ssl
         self.timeout = timeout
         self.session = requests.Session()
         self.session.auth = (username, password)
         self.session.verify = verify_ssl
-        if not verify_ssl and InsecureRequestWarning is not None:
+        if not verify_ssl:
             urllib3.disable_warnings(category=InsecureRequestWarning)
 
     def _collection_url(self, collection):

@@ -5,7 +5,7 @@ import re
 import threading
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 from .models import Task
@@ -31,9 +31,6 @@ class TaskBlock:
     task: Task
     start: int
     end: int
-    properties_start: int | None = None
-    properties_end: int | None = None
-    planning_end: int | None = None
     has_completed_property: bool = False
 
 
@@ -58,23 +55,12 @@ def format_org_date(value):
     return f"<{value.isoformat()}>"
 
 
-def split_title_and_tags(title):
-    match = re.match(r"^(?P<title>.*?)(?:\s+:(?P<tags>[A-Za-z0-9_@#%:.-]+):)?\s*$", title)
-    if not match:
-        return title.strip(), []
-    tags = [tag for tag in (match.group("tags") or "").split(":") if tag]
-    return match.group("title").strip(), tags
-
-
 class TodoFile:
     def __init__(self, fullpath, relative_path=None):
         self.fullpath = Path(fullpath)
         self.relative_path = relative_path or self.fullpath.name
         self.collection = collection_slug(self.relative_path)
-        self.tasks = {}
-        self.blocks = {}
         self.lock = threading.Lock()
-        self._load_tasks_from_file()
 
     def _ensure_file(self):
         self.fullpath.parent.mkdir(parents=True, exist_ok=True)
@@ -103,8 +89,6 @@ class TodoFile:
                 self._write_lines(lines)
                 blocks = self._parse_blocks(lines)
 
-        self.tasks = {block.task.uid: [block.task, block.start] for block in blocks if block.task.uid}
-        self.blocks = {block.task.uid: block for block in blocks if block.task.uid}
         return blocks
 
     def _parse_blocks(self, lines):
@@ -132,15 +116,11 @@ class TodoFile:
 
     def _parse_block(self, lines, start, end, match, parent_uid):
         properties = {}
-        properties_start = None
-        properties_end = None
         cursor = start + 1
         if cursor < end and lines[cursor].strip() == ":PROPERTIES:":
-            properties_start = cursor
             cursor += 1
             while cursor < end:
                 if lines[cursor].strip() == ":END:":
-                    properties_end = cursor
                     cursor += 1
                     break
                 prop_match = PROPERTY_RE.match(lines[cursor].rstrip("\n"))
@@ -175,9 +155,8 @@ class TodoFile:
         description = "\n".join(description_lines).strip()
 
         priority_letter = match.group(4)
-        content, tags = split_title_and_tags(match.group("title"))
-        if match.group("tags"):
-            tags = [tag for tag in match.group("tags").split(":") if tag]
+        content = match.group("title").strip()
+        tags = [tag for tag in (match.group("tags") or "").split(":") if tag]
         percent_match = PERCENT_RE.search(content)
         percent_complete = None
         if percent_match:
@@ -204,15 +183,7 @@ class TodoFile:
             parent_uid=properties.get("CALDAV_PARENT_UID") or parent_uid,
             collection=self.collection,
         )
-        return TaskBlock(
-            task,
-            start,
-            end,
-            properties_start,
-            properties_end,
-            planning_end,
-            "CALDAV_COMPLETED" in properties,
-        )
+        return TaskBlock(task, start, end, "CALDAV_COMPLETED" in properties)
 
     def _render_blocks_into_lines(self, lines, blocks):
         rendered = []
@@ -258,11 +229,9 @@ class TodoFile:
     def get_tasks(self, ensure_uids=True):
         return [block.task for block in self._load_tasks_from_file(ensure_uids=ensure_uids)]
 
-    def find_task(self, content=None, source_file=None, uid=None):
+    def find_task(self, uid):
         for task in self.get_tasks():
-            if uid and task.uid == uid:
-                return task
-            if content and task.content == content and (source_file is None or task.source_file == source_file):
+            if task.uid == uid:
                 return task
         return None
 
@@ -276,7 +245,7 @@ class TodoFile:
             relevant = [
                 task
                 for task in tasks
-                if task.source_file in {self.relative_path, "ANY"} or task.collection == self.collection
+                if task.source_file == self.relative_path or task.collection == self.collection
             ]
             for task in relevant:
                 if not task.uid:
@@ -345,12 +314,10 @@ class LocalFiles:
 
     def __init__(self, directory):
         self.directory = Path(directory)
-        self.files = {}
-        self._scan_todo_files()
 
     def _scan_todo_files(self):
         self.directory.mkdir(parents=True, exist_ok=True)
-        self.files = {}
+        todo_files = {}
 
         for root, _dirs, files in os.walk(self.directory):
             for filename in files:
@@ -359,58 +326,43 @@ class LocalFiles:
 
                 file_path = Path(root) / filename
                 relative_path = str(file_path.relative_to(self.directory))
-                self.files[relative_path] = TodoFile(file_path, relative_path)
+                todo_files[relative_path] = TodoFile(file_path, relative_path)
+        return todo_files
 
     def get_tasks(self, ensure_uids=True):
-        self._scan_todo_files()
         tasks = []
-        for todo_file in self.files.values():
+        for todo_file in self._scan_todo_files().values():
             tasks.extend(todo_file.get_tasks(ensure_uids=ensure_uids))
         return tasks
 
     def get_tasks_by_file(self, ensure_uids=True):
-        self._scan_todo_files()
         return {
             relative_path: todo_file.get_tasks(ensure_uids=ensure_uids)
-            for relative_path, todo_file in self.files.items()
+            for relative_path, todo_file in self._scan_todo_files().items()
         }
 
-    def find_task(self, content=None, source_file=None, uid=None):
-        self._scan_todo_files()
-        matches = []
-        for todo_file in self.files.values():
-            task = todo_file.find_task(content=content, source_file=source_file, uid=uid)
+    def find_task(self, uid):
+        for todo_file in self._scan_todo_files().values():
+            task = todo_file.find_task(uid)
             if task is not None:
-                matches.append(task)
-
-        if uid:
-            return matches[0] if matches else None
-        if len(matches) == 1:
-            return matches[0]
+                return task
         return None
 
     def update(self, tasks, allow_reopen=False):
-        self._scan_todo_files()
+        todo_files = self._scan_todo_files()
         tasks_by_file = {}
         for task in tasks:
-            if task.source_file == "ANY":
-                for todo_file in self.files.values():
-                    tasks_by_file.setdefault(todo_file.relative_path, []).append(task)
-                continue
-
             tasks_by_file.setdefault(task.source_file, []).append(task)
 
         for relative_path, grouped_tasks in tasks_by_file.items():
-            todo_file = self.files.get(relative_path)
+            todo_file = todo_files.get(relative_path)
             if todo_file is None:
                 fullpath = self.directory / relative_path
                 todo_file = TodoFile(fullpath, relative_path)
-                self.files[relative_path] = todo_file
             todo_file.update(grouped_tasks, allow_reopen=allow_reopen)
 
     def delete(self, source_file, uid):
-        self._scan_todo_files()
-        todo_file = self.files.get(source_file)
+        todo_file = self._scan_todo_files().get(source_file)
         if todo_file is None:
             return False
         return todo_file.delete(uid)

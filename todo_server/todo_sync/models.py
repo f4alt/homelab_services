@@ -45,10 +45,6 @@ class Task:
         if self.percent_complete is not None:
             self.percent_complete = max(0, min(100, int(self.percent_complete)))
 
-    @property
-    def key(self):
-        return self.uid or f"{self.source_file}:{self.content}"
-
     def copy_with(self, **changes):
         values = {
             "level": self.level,
@@ -69,9 +65,6 @@ class Task:
         }
         values.update(changes)
         return Task(**values)
-
-    def done_copy(self):
-        return self.copy_with(status="DONE")
 
     def normalized_dict(self):
         return {

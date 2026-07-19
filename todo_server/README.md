@@ -11,7 +11,7 @@ The app watches local `.org` files, maps each file to one [Radicale](https://rad
 - `todo_sync/caldav_client.py`: talks to Radicale over CalDAV HTTP methods.
 - `todo_sync/sync.py`: compares local hashes, remote hashes, ETags, and tombstones to decide what to push or pull.
 - `todo_sync/api.py`: serves `/health`, `/tasks`, `/sync`, and `/tasks/update`.
-- `radicale/`: local Radicale config, users file, and generated self-signed TLS certificate.
+- `radicale/`: local Radicale config, users file, and a staging directory for externally managed TLS certificates.
 
 ## Running
 
@@ -28,17 +28,10 @@ TODO_FILES_HOST_PATH=/path/to/org/files docker compose up -d --build
 ```
 
 If `TODO_FILES_HOST_PATH` is omitted, Compose mounts `../todo_files`.
-The default profile expects `RADICALE_CERT_HOST_PATH` to contain `cert.pem` and
-`key.pem`, either from the bundled generator or from an external cert manager
-such as Ansible/Caddy.
-
-To run the bundled self-signed certificate helper:
-
-```sh
-docker compose --profile self_cert up -d --build
-```
-
-To use externally managed certificates:
+`RADICALE_CERT_HOST_PATH` must contain externally managed `cert.pem` and
+`key.pem` files before Radicale starts. Both files must be readable by the
+unprivileged Radicale container user; the caller or certificate manager must
+set suitable ownership, permissions, and host security labels. For example:
 
 ```sh
 RADICALE_CERT_HOST_PATH=/etc/caddy/radicale docker compose up -d --build
@@ -49,7 +42,6 @@ Services:
 - `todo_api`: dashboard/API server on port `5000`.
 - `todo_sync_worker`: periodic org ↔ CalDAV sync loop.
 - `radicale`: HTTPS CalDAV server on port `5232`.
-  - `radicale_cert`: optional helper service for managing self-signed SSL certificates.
 
 Useful commands:
 
@@ -94,24 +86,19 @@ Common settings:
 - `CALDAV_URL`: bridge-to-Radicale URL, default `https://radicale:5232/`.
 - `CALDAV_USERNAME`: CalDAV username, default `todo`.
 - `CALDAV_PASSWORD`: CalDAV password, default `todo`.
-- `CALDAV_VERIFY_SSL`: bridge certificate verification, default `false` for the bundled self-signed cert.
+- `CALDAV_VERIFY_SSL`: bridge certificate verification, default `false` for the internal Radicale service connection.
 - `CALDAV_COLLECTION_PREFIX`: optional prefix for generated collection names.
 - `TODO_FILES_HOST_PATH`: host directory mounted at `/data/todo_files`, default `../todo_files`.
 - `API_HOST_PORT`: host port published to the API container's port `5000`, default `5000`.
 - `RADICALE_HOST_PORT`: host port published to the Radicale container's port `5232`, default `5232`.
 - `RADICALE_CONFIG_HOST_PATH`: host Radicale config file mounted at `/config/config`, default `./radicale/config`.
 - `RADICALE_USERS_HOST_PATH`: host Radicale users file mounted at `/config/users`, default `./radicale/users`.
-- `RADICALE_CERT_HOST_PATH`: host certificate directory mounted at `/config/certs`, default `./radicale/generated-certs`. External cert managers should provide `cert.pem` and `key.pem` here unless `RADICALE_CONFIG_HOST_PATH` points at a config with different filenames.
+- `RADICALE_CERT_HOST_PATH`: host certificate directory mounted read-only at `/config/certs`, default `./radicale/generated-certs`. A caller or external certificate manager must provide `cert.pem` and `key.pem` here unless `RADICALE_CONFIG_HOST_PATH` points at a config with different filenames.
 - `API_PORT`: local non-Docker API port, default `5000`; Docker Compose host publishing uses `API_HOST_PORT`.
-- `RADICALE_CERT_DAYS`: generated certificate lifetime, default `825`.
-- `RADICALE_CERT_RENEW_BEFORE_DAYS`: regenerate when fewer than this many days remain, default `30`.
-- `RADICALE_CERT_CHECK_INTERVAL_SECONDS`: how often the helper checks for IP/expiry drift while the stack is running, default `172800`.
-- `RADICALE_CERT_COMMON_NAME`: certificate common name, default `radicale.local`.
-- `RADICALE_CERT_EXTRA_SANS`: comma-separated extra certificate SANs, such as `IP:192.168.1.25,DNS:todo.local`.
 
 Credential coupling: Radicale reads users from `radicale/users`, while the bridge reads `CALDAV_USERNAME` and `CALDAV_PASSWORD`. If you change credentials, update both.
 
-TLS coupling: clients connect to the host IP and `RADICALE_HOST_PORT`, while containers connect to `https://radicale:5232/`. The bridge disables TLS verification by default, but phones generally need the served certificate installed and trusted when using the bundled self-signed helper.
+TLS coupling: clients connect to the host IP and `RADICALE_HOST_PORT`, while containers connect to `https://radicale:5232/`. The bridge disables TLS verification by default. The caller or certificate manager is responsible for issuing, renewing, and installing a certificate that clients trust.
 
 ## Org Behavior
 
@@ -143,24 +130,14 @@ Synced fields:
 
 - `GET /health`: health check.
 - `GET /tasks`: list local tasks from all org files.
-- `GET|POST /sync`: run sync immediately.
-- `POST /tasks/update`: update local task status.
+- `POST /sync`: run sync immediately.
+- `POST /tasks/update`: update local task status by CalDAV UID.
 
-Preferred update payload:
+Update payload:
 
 ```json
 {
   "uid": "task-caldav-uid",
-  "status": "DONE"
-}
-```
-
-Legacy content/source updates still work when unambiguous:
-
-```json
-{
-  "content": "Pay bill",
-  "source_file": "home.org",
   "status": "DONE"
 }
 ```

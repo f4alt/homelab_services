@@ -3,10 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-try:
-    from dotenv import load_dotenv
-except ImportError:  # pragma: no cover - useful when imported before deps install
-    load_dotenv = None
+from dotenv import load_dotenv
 
 
 def _bool_from_env(name, default=False):
@@ -33,8 +30,7 @@ class Settings:
 
     @classmethod
     def from_env(cls, env_file=None):
-        if load_dotenv is not None:
-            load_dotenv(env_file)
+        load_dotenv(env_file)
 
         todo_directory = Path(os.getenv("TODO_DIRECTORY", cls.DEFAULT_TODO_DIRECTORY))
         sync_state_file = os.getenv("SYNC_STATE_FILE")

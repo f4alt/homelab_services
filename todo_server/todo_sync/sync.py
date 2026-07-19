@@ -7,8 +7,7 @@ from pathlib import Path
 
 from .caldav_client import CalDavStore
 from .config import Settings
-from .models import Task
-from .org_files import LocalFiles
+from .org_files import LocalFiles, collection_slug
 
 
 @dataclass
@@ -83,9 +82,9 @@ class SyncService:
     def get_local_tasks(self):
         return self.local_files().get_tasks()
 
-    def update_local_task(self, content=None, status=None, source_file=None, uid=None):
+    def update_local_task(self, uid, status):
         local_files = self.local_files()
-        task = local_files.find_task(content=content, source_file=source_file, uid=uid)
+        task = local_files.find_task(uid)
         if task is None:
             return None
 
@@ -101,12 +100,9 @@ class SyncService:
         local_files = self.local_files()
         local_by_file = local_files.get_tasks_by_file(ensure_uids=True)
         collections = {
-            source_file: tasks[0].collection
+            source_file: tasks[0].collection if tasks else collection_slug(source_file)
             for source_file, tasks in local_by_file.items()
-            if tasks
         }
-        for source_file, todo_file in local_files.files.items():
-            collections.setdefault(source_file, todo_file.collection)
 
         remote_store = self.remote_store()
         remote_tasks = remote_store.get_tasks(collections)
@@ -126,7 +122,7 @@ class SyncService:
             previous = state.records.get(uid)
 
             if local_task and remote_task:
-                self._sync_existing(uid, local_task, remote_task, previous, local_files, remote_store, state)
+                self._sync_existing(local_task, remote_task, previous, local_files, remote_store, state)
             elif local_task:
                 self._sync_local_only(
                     uid,
@@ -143,9 +139,9 @@ class SyncService:
                 state.delete_record(uid, source="both-missing")
 
         state.save()
-        return SyncResult(task_count=len(self.get_local_tasks()), synced_at=datetime.now(timezone.utc))
+        return SyncResult(task_count=len(local_files.get_tasks()), synced_at=datetime.now(timezone.utc))
 
-    def _sync_existing(self, uid, local_task, remote_task, previous, local_files, remote_store, state):
+    def _sync_existing(self, local_task, remote_task, previous, local_files, remote_store, state):
         local_changed = previous is None or previous.get("local_hash") != local_task.content_hash()
         remote_hash = remote_task.content_hash()
         remote_task.meta["remote_hash"] = remote_hash

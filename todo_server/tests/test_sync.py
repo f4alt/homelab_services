@@ -13,8 +13,10 @@ class FakeRemoteStore:
         self.tasks = {task.uid: task for task in tasks}
         self.puts = []
         self.deletes = []
+        self.requested_collections = None
 
     def get_tasks(self, collections):
+        self.requested_collections = collections
         return list(self.tasks.values())
 
     def put_task(self, task, etag=None):
@@ -38,6 +40,17 @@ class FakeSyncService(SyncService):
 
 
 class SyncServiceTest(unittest.TestCase):
+    def test_empty_org_file_still_selects_its_remote_collection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            (directory / "empty.org").write_text("", encoding="utf-8")
+            remote = FakeRemoteStore([])
+            settings = Settings(todo_directory=directory, sync_state_file=directory / ".state.json")
+
+            FakeSyncService(settings, remote).run_once()
+
+            self.assertEqual(remote.requested_collections, {"empty.org": "empty"})
+
     def test_remote_change_wins_when_both_sides_changed(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)

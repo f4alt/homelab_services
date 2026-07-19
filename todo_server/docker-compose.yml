@@ -1,34 +1,7 @@
 services:
-  radicale_cert:
-    profiles:
-      - self_cert
-    build:
-      context: ./radicale/cert-init
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      RADICALE_CERT_DIR: /certs
-      RADICALE_CERT_DAYS: ${RADICALE_CERT_DAYS:-825}
-      RADICALE_CERT_RENEW_BEFORE_DAYS: ${RADICALE_CERT_RENEW_BEFORE_DAYS:-30}
-      RADICALE_CERT_CHECK_INTERVAL_SECONDS: ${RADICALE_CERT_CHECK_INTERVAL_SECONDS:-172800}
-      RADICALE_CERT_COMMON_NAME: ${RADICALE_CERT_COMMON_NAME:-radicale.local}
-      RADICALE_CERT_EXTRA_SANS: ${RADICALE_CERT_EXTRA_SANS:-}
-    healthcheck:
-      test: ["CMD", "generate-cert", "--check"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    volumes:
-      - ${RADICALE_CERT_HOST_PATH:-./radicale/generated-certs}:/certs
-    command: ["generate-cert", "--watch"]
-
   radicale:
     image: tomsquest/docker-radicale:latest
     restart: unless-stopped
-    depends_on:
-      radicale_cert:
-        condition: service_healthy
-        required: false
     healthcheck:
       test: ["CMD", "curl", "-k", "-f", "https://127.0.0.1:5232/"]
       interval: 30s

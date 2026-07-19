@@ -19,7 +19,7 @@ def create_app(settings=None):
     def health():
         return jsonify({"status": "ok"})
 
-    @app.route("/sync", methods=["GET", "POST"])
+    @app.post("/sync")
     def sync_once():
         result = service.run_once()
         return jsonify({"message": "Todos synced.", "sync": result.to_dict()})
@@ -36,19 +36,17 @@ def create_app(settings=None):
             return jsonify({"error": "Invalid JSON data"}), 400
 
         uid = data.get("uid")
-        content = data.get("content")
         status = data.get("status")
-        source_file = data.get("source_file")
-        if not uid and not content:
-            return jsonify({"error": "uid or content is required"}), 400
+        if not uid:
+            return jsonify({"error": "uid is required"}), 400
         if not status:
             return jsonify({"error": "status is required"}), 400
         if status not in VALID_STATUSES:
             return jsonify({"error": f"status must be one of {sorted(VALID_STATUSES)}"}), 400
 
-        task = service.update_local_task(content=content, status=status, source_file=source_file, uid=uid)
+        task = service.update_local_task(uid=uid, status=status)
         if task is None:
-            return jsonify({"error": "Task not found or ambiguous; include uid or source_file"}), 404
+            return jsonify({"error": "Task not found"}), 404
 
         return jsonify({"task": task.to_dict()})
 

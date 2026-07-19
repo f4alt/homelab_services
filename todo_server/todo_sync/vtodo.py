@@ -1,40 +1,10 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
+
+from icalendar import Calendar, Todo
 
 from .models import Task
-
-try:
-    from icalendar import Calendar, Todo
-except ImportError:  # pragma: no cover - fallback keeps local tests runnable before deps install
-    Calendar = None
-    Todo = None
-
-
-def _escape(value):
-    return str(value).replace("\\", "\\\\").replace("\n", "\\n").replace(",", "\\,").replace(";", "\\;")
-
-
-def _unescape(value):
-    return value.replace("\\n", "\n").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
-
-
-def _format_ical_date(value):
-    if isinstance(value, datetime):
-        return value.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    if isinstance(value, date):
-        return value.strftime("%Y%m%d")
-    return str(value)
-
-
-def _parse_ical_date(value):
-    if not value:
-        return None
-    if value.endswith("Z"):
-        return datetime.strptime(value, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
-    if "T" in value:
-        return datetime.strptime(value, "%Y%m%dT%H%M%S")
-    return datetime.strptime(value, "%Y%m%d").date()
 
 
 def _first_value(component, key):
@@ -71,7 +41,7 @@ def _categories(component):
     return tags
 
 
-def _task_to_icalendar(task):
+def task_to_ical(task: Task):
     calendar = Calendar()
     calendar.add("prodid", "-//todo-sync-server//caldav bridge//EN")
     calendar.add("version", "2.0")
@@ -108,50 +78,7 @@ def _task_to_icalendar(task):
     return calendar.to_ical().decode("utf-8")
 
 
-def _task_to_plain_ical(task):
-    lines = [
-        "BEGIN:VCALENDAR",
-        "PRODID:-//todo-sync-server//caldav bridge//EN",
-        "VERSION:2.0",
-        "BEGIN:VTODO",
-        f"UID:{_escape(task.uid)}",
-        f"SUMMARY:{_escape(task.content)}",
-        f"STATUS:{'COMPLETED' if task.status == 'DONE' else 'NEEDS-ACTION'}",
-        f"LAST-MODIFIED:{_format_ical_date(datetime.now(timezone.utc))}",
-    ]
-    if task.description:
-        lines.append(f"DESCRIPTION:{_escape(task.description)}")
-    if task.tags:
-        lines.append(f"CATEGORIES:{','.join(_escape(tag) for tag in task.tags)}")
-    if task.priority is not None:
-        lines.append(f"PRIORITY:{task.priority}")
-    if task.scheduled is not None:
-        lines.append(f"DTSTART:{_format_ical_date(task.scheduled)}")
-    if task.deadline is not None:
-        lines.append(f"DUE:{_format_ical_date(task.deadline)}")
-    if task.completed_at is not None:
-        lines.append(f"COMPLETED:{_format_ical_date(task.completed_at)}")
-    elif task.status == "DONE":
-        lines.append(f"COMPLETED:{_format_ical_date(datetime.now(timezone.utc))}")
-    if task.percent_complete is not None:
-        lines.append(f"PERCENT-COMPLETE:{task.percent_complete}")
-    if task.parent_uid:
-        lines.append(f"RELATED-TO:{_escape(task.parent_uid)}")
-    if task.source_file:
-        lines.append(f"X-ORG-SOURCE-FILE:{_escape(task.source_file)}")
-    if task.collection:
-        lines.append(f"X-ORG-COLLECTION:{_escape(task.collection)}")
-    lines.extend(["END:VTODO", "END:VCALENDAR", ""])
-    return "\r\n".join(lines)
-
-
-def task_to_ical(task: Task):
-    if Calendar is not None:
-        return _task_to_icalendar(task)
-    return _task_to_plain_ical(task)
-
-
-def _task_from_icalendar(ical_data, source_file=None, collection=None, meta=None):
+def task_from_ical(ical_data, source_file=None, collection=None, meta=None):
     calendar = Calendar.from_ical(ical_data)
     todo = next((component for component in calendar.walk() if component.name == "VTODO"), None)
     if todo is None:
@@ -180,52 +107,3 @@ def _task_from_icalendar(ical_data, source_file=None, collection=None, meta=None
         collection=coll,
         meta=meta or {},
     )
-
-
-def _parse_plain_ical(ical_data):
-    values = {}
-    in_todo = False
-    for raw_line in ical_data.replace("\r\n", "\n").split("\n"):
-        line = raw_line.strip()
-        if line == "BEGIN:VTODO":
-            in_todo = True
-            continue
-        if line == "END:VTODO":
-            break
-        if not in_todo or ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        values[key.upper().split(";", 1)[0]] = _unescape(value)
-    return values
-
-
-def _task_from_plain_ical(ical_data, source_file=None, collection=None, meta=None):
-    values = _parse_plain_ical(ical_data)
-    if not values:
-        return None
-    status = values.get("STATUS", "NEEDS-ACTION").upper()
-    source = source_file or values.get("X-ORG-SOURCE-FILE", "")
-    coll = collection or values.get("X-ORG-COLLECTION", source)
-    return Task(
-        level=1,
-        status="DONE" if status == "COMPLETED" else "TODO",
-        content=values.get("SUMMARY", "Untitled"),
-        source_file=source,
-        uid=values.get("UID"),
-        description=values.get("DESCRIPTION", ""),
-        tags=[tag for tag in values.get("CATEGORIES", "").split(",") if tag],
-        priority=int(values["PRIORITY"]) if values.get("PRIORITY") else None,
-        scheduled=_parse_ical_date(values.get("DTSTART")),
-        deadline=_parse_ical_date(values.get("DUE")),
-        completed_at=_parse_ical_date(values.get("COMPLETED")),
-        percent_complete=int(values["PERCENT-COMPLETE"]) if values.get("PERCENT-COMPLETE") else None,
-        parent_uid=values.get("RELATED-TO"),
-        collection=coll,
-        meta=meta or {},
-    )
-
-
-def task_from_ical(ical_data, source_file=None, collection=None, meta=None):
-    if Calendar is not None:
-        return _task_from_icalendar(ical_data, source_file=source_file, collection=collection, meta=meta)
-    return _task_from_plain_ical(ical_data, source_file=source_file, collection=collection, meta=meta)
