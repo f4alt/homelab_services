@@ -1,12 +1,14 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fping speedtest-cli \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install production deps
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-# Copy app code
 COPY gateway.js ./
 COPY platform/ ./platform/
 COPY widget-routes/ ./widget-routes/
@@ -14,7 +16,6 @@ COPY widget-routes/ ./widget-routes/
 ENV NODE_ENV=production
 EXPOSE 3000
 
-# Drop privileges (node user exists in node:alpine)
 USER node
 
 CMD ["node", "gateway.js"]

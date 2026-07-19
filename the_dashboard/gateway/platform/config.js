@@ -26,10 +26,33 @@ function parseUrlBase(env, name, fallback) {
   return url.toString().replace(/\/+$/, "");
 }
 
-export function readGatewayConfig(env = process.env) {
+function normalizeHost(hostname) {
+  return String(hostname || "").trim().toLowerCase();
+}
+
+export function hostIsAllowed(hostname, patterns) {
+  const host = normalizeHost(hostname);
+
+  return patterns.some((pattern) => {
+    const rule = normalizeHost(pattern);
+
+    if (!rule) return false;
+    if (rule === "*") return true;
+    if (rule.startsWith("*.")) {
+      const suffix = rule.slice(1);
+      return host.endsWith(suffix) && host.length > suffix.length;
+    }
+    if (rule.endsWith("*")) {
+      return host.startsWith(rule.slice(0, -1));
+    }
+    return host === rule;
+  });
+}
+
+function readGatewayConfig(env = process.env) {
   return {
     port: 3000,
-    netstatsBaseUrl: "http://netstats:4000",
+    pingTarget: env.PING_TARGET || "8.8.8.8",
     todoBaseUrl: parseUrlBase(env, "TODO_API_BASE_URL", "http://host.docker.internal:5000"),
     dashboardConfigPath: "/dashboard/config.js",
     dashboardConfigValidatorPath: "/dashboard/platform/config-validator.mjs",

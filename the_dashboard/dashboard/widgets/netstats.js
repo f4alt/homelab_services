@@ -179,7 +179,7 @@ import { fetchJson, createElement } from "../platform/global.js";
       state.valDL.textContent = formatMbps(dl);
       state.valUL.textContent = formatMbps(ul);
       state.valPing.textContent = formatMillis(j.ping_ms);
-    } catch (err) {
+    } catch {
       state.valDL.textContent = "err";
       state.valUL.textContent = "err";
       state.valPing.textContent = "err";
@@ -254,10 +254,7 @@ import { fetchJson, createElement } from "../platform/global.js";
       const cfg = {
         ipRefreshMs:      (props?.ipRefreshMs      ?? 600000),
         pingIntervalMs:   (props?.pingIntervalMs   ?? 5000),
-        dlBytes:          (props?.dlBytes          ?? 40 * 1024 * 1024),
-        ulBytes:          (props?.ulBytes          ?? 12 * 1024 * 1024),
-        maxSamples:       (props?.maxSamples       ?? 60),
-        dlParallel:       (props?.dlParallel       ?? 4)
+        maxSamples:       (props?.maxSamples       ?? 60)
       };
 
       // parent wrapper

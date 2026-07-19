@@ -1,33 +1,11 @@
 import { Router } from "express";
-import { CONFIG } from "../config.js";
+import { CONFIG, hostIsAllowed } from "../config.js";
 import { errorPayload, sendError, sendOk } from "../responses.js";
 
 const router = Router();
 
-function normalizeHost(hostname) {
-  return String(hostname || "").trim().toLowerCase();
-}
-
-function hostMatchesPattern(hostname, pattern) {
-  const host = normalizeHost(hostname);
-  const rule = normalizeHost(pattern);
-
-  if (!rule) return false;
-  if (rule === "*") return true;
-  if (rule.startsWith("*.")) {
-    const suffix = rule.slice(1);
-    return host.endsWith(suffix) && host.length > suffix.length;
-  }
-  if (rule.endsWith("*")) {
-    return host.startsWith(rule.slice(0, -1));
-  }
-  return host === rule;
-}
-
 function allowedHost(hostname) {
-  return CONFIG.statusProbe.allowedHosts.some((pattern) =>
-    hostMatchesPattern(hostname, pattern)
-  );
+  return hostIsAllowed(hostname, CONFIG.statusProbe.allowedHosts);
 }
 
 function asUrl(raw, scheme) {

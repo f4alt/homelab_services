@@ -272,13 +272,11 @@ import { createStack, fetchJson, setStateMessage } from "../platform/global.js";
         ? props.stations.map(s => String(s).trim().toUpperCase()).filter(Boolean)
         : [];
 
-      const refreshMs = typeof props?.refreshMs === "number" ? props.refreshMs : 60000;
-
       const grid = createStack();
       root.replaceChildren(grid);
       if (!stations.length) {
         setStateMessage(grid, "No METAR stations configured.", "empty");
-        return { root, grid, stations, rows: {}, refreshMs, lastFetch: 0 };
+        return { root, grid, stations, rows: {} };
       }
 
       const rows = {};
@@ -292,20 +290,11 @@ import { createStack, fetchJson, setStateMessage } from "../platform/global.js";
         root,
         grid,
         stations,
-        rows,
-        refreshMs,
-        lastFetch: 0
+        rows
       };
     },
 
     async update(instance) {
-      const now = Date.now();
-
-      // need to refresh?
-      if (now - instance.lastFetch < instance.refreshMs)
-        return;
-      instance.lastFetch = now;
-
       // hit backend for data
       const dataByStation = await fetchMetars(instance.stations);
 

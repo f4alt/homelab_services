@@ -101,11 +101,12 @@ check("config editor page is served", async () => {
 });
 
 check("short config editor URL serves editor page", async () => {
-  const { response, text } = await request("/editor", {
+  const { response, text } = await request("/config", {
     headers: { Accept: "text/html" }
   });
 
   assert(response.ok, `expected HTTP 2xx, got ${response.status}`);
+  assert(!response.redirected, "/config should directly serve the editor page");
   assert(text.includes('id="source"'), "short editor URL did not resolve to editor page");
 });
 
@@ -118,22 +119,9 @@ check("config API returns current source", async () => {
   assert(text.includes("window.DASH_CONFIG"), "config API source missing DASH_CONFIG");
 });
 
-check("config API validates current source", async () => {
-  const current = await request("/api/config", {
-    headers: { Accept: "application/javascript" }
-  });
-  const { response, json } = await request("/api/config/validate", {
-    method: "POST",
-    body: JSON.stringify({ source: current.text })
-  });
-
-  assert(response.ok, `expected HTTP 2xx, got ${response.status}`);
-  assert(json?.ok === true, "config validation did not report ok=true");
-});
-
 check("config API rejects malformed source", async () => {
-  const { response, json } = await request("/api/config/validate", {
-    method: "POST",
+  const { response, json } = await request("/api/config", {
+    method: "PUT",
     body: JSON.stringify({ source: "window.DASH_CONFIG = {" })
   });
 
@@ -143,8 +131,8 @@ check("config API rejects malformed source", async () => {
 });
 
 check("config API rejects invalid dashboard config", async () => {
-  const { response, json } = await request("/api/config/validate", {
-    method: "POST",
+  const { response, json } = await request("/api/config", {
+    method: "PUT",
     body: JSON.stringify({ source: "window.DASH_CONFIG = { widgets: [] };" })
   });
 
@@ -188,16 +176,7 @@ check("config API saves valid current source", async () => {
   assert(served.text === current.text, "nginx-served config did not match saved source");
 });
 
-check("gateway health reports netstats dependency", async () => {
-  const { response, json } = await request("/api/health");
-
-  assert(response.ok, `expected HTTP 2xx, got ${response.status}`);
-  assert(json?.ok === true, "gateway health did not report ok=true");
-  assert(json?.error === null, "gateway health should not include an error");
-  assert(json?.data?.dependencies?.netstats?.ok === true, "netstats dependency is not healthy");
-});
-
-check("netstats ping route works through gateway", async () => {
+check("network ping route works through gateway", async () => {
   const { response, json } = await request("/api/net/ping?target=localhost");
 
   assert(response.ok, `expected HTTP 2xx, got ${response.status}`);
@@ -206,12 +185,27 @@ check("netstats ping route works through gateway", async () => {
   assert(json?.data?.target === "localhost", "ping target did not round-trip");
 });
 
-check("netstats ping route rejects disallowed targets", async () => {
+check("network ping route rejects disallowed targets", async () => {
   const { response, json } = await request("/api/net/ping?target=example.invalid");
 
   assert(response.status === 400, `expected HTTP 400, got ${response.status}`);
   assert(json?.ok === false, "disallowed ping should report ok=false");
   assert(json?.error?.code === "target_not_allowed", "disallowed ping error code mismatch");
+});
+
+check("removed API routes stay absent", async () => {
+  const checks = await Promise.all([
+    request("/api/health"),
+    request("/api/config/validate", {
+      method: "POST",
+      body: JSON.stringify({ source: "window.DASH_CONFIG = {};" })
+    }),
+    request("/api/todos/sync")
+  ]);
+
+  for (const { response } of checks) {
+    assert(response.status === 404, `expected HTTP 404, got ${response.status}`);
+  }
 });
 
 check("status route validates empty target list", async () => {
@@ -225,19 +219,18 @@ check("status route validates empty target list", async () => {
   assert(json?.error?.code === "validation_error", "empty statuschecks error code mismatch");
 });
 
-check("status route can probe internal service health", async () => {
+check("status route probes an allowed network target", async () => {
   const { response, json } = await request("/api/statuschecks", {
     method: "POST",
     body: JSON.stringify({
-      targets: [{ url: "localhost:3000/api/health" }]
+      targets: [{ url: "localhost:3000/missing" }]
     })
   });
 
   assert(response.ok, `expected HTTP 2xx, got ${response.status}`);
   assert(json?.ok === true, "statuschecks response did not report ok=true");
-  assert(json?.error === null, "statuschecks response should not include an error");
-  assert(Array.isArray(json?.data?.results), "statuschecks results missing");
-  assert(json.data.results[0]?.ok === true, "internal netstats probe failed");
+  assert(json?.data?.results?.[0]?.ok === true, "allowed target was not reachable");
+  assert(json.data.results[0].status === 404, "unexpected allowed target status");
 });
 
 check("status route rejects disallowed target hosts", async () => {

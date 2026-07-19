@@ -73,7 +73,6 @@ window.DASH_CONFIG = {
       props: {
         tile_minWidth: 220,
         services: [
-          { name: "Dashboard Gateway", icon: "", url: "localhost:3000/api/health" },
           { name: "Router", icon: "🛜", url: "192.168.1.1" },
         ]
       }

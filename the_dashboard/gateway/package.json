@@ -7,7 +7,6 @@
   "license": "MIT",
   "engines": { "node": ">=20" },
   "dependencies": {
-    "express": "^4.19.2",
-    "luxon": "^3.7.1"
+    "express": "^4.19.2"
   }
 }

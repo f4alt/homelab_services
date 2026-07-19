@@ -19,7 +19,7 @@ docker compose up --build -d
 ```
 
 The dashboard is served by Nginx at `http://localhost:8080` by default. Gateway
-and Netstats are internal-only services on the Compose network.
+is the single internal backend service on the Compose network.
 
 ## Project Shape
 
@@ -31,7 +31,6 @@ and Netstats are internal-only services on the Compose network.
 | `gateway/gateway.js` | Express app setup and route mounting surface. |
 | `gateway/widget-routes/` | Backend companion routes for widgets. |
 | `gateway/platform/` | Gateway env parsing, response helpers, and platform-owned routes. |
-| `netstats/` | Internal network diagnostics service. |
 | `nginx/` | Static serving and `/api` reverse proxy config. |
 | `tests/` | Smoke and validation checks. |
 
@@ -55,15 +54,20 @@ Important environment knobs are documented in `.env.example`, including:
 The default status-probe allowlist is intentionally minimal: `localhost`. Add
 LAN hosts or patterns locally only when a widget needs them.
 
-Gateway and Netstats use fixed internal Compose ports, `3000` and `4000`. They
-are not published on the host; only Nginx's `DASHBOARD_HTTP_PORT` is host-facing.
+Gateway uses the fixed internal Compose port `3000`. It is not published on the
+host; only Nginx's `DASHBOARD_HTTP_PORT` is host-facing. Gateway also runs the
+ping and speed-test commands behind `/api/net/*`; those routes report network
+behavior, not container health.
 
 Runtime config files are served with `Cache-Control: no-store` so office tuning
 does not get stuck behind browser cache.
 
 ### Browser Config Editor
 
-For quick config edits, use `/config` route which should redirect to `localhost:8080/platform/config-editor.html`. This should open a simple config.js editor which can be used for editing. This intentionally is lightweight and has no authentication or protections; do not expose this outside a trusted network.
+For quick config edits, open `/config`. Nginx directly serves the lightweight
+`config.js` editor at that canonical short route; there is no `/editor` alias.
+The editor intentionally has no authentication or other access protections, so
+do not expose it outside a trusted network.
 
 ## API Contract
 
@@ -92,9 +96,7 @@ Failures use:
 
 Current platform-owned routes include:
 
-- `GET /api/health`
 - `GET /api/config`
-- `POST /api/config/validate`
 - `PUT /api/config`
 - `GET /api/net/myip`
 - `GET /api/net/ping`
@@ -122,6 +124,9 @@ Dashboard config is validated before widgets load. Widget declarations require a
 unique `id`, a valid `type`, optional `width`, optional `refreshMs`, optional
 object `props`.
 
+`PUT /api/config` validates submitted source before replacing `config.js`.
+Malformed or invalid source is rejected without changing the saved config.
+
 Widget modules receive `mount(root, { id, type, props })` and may expose
 an async `update(state)` method. Shared widget helpers live in
 `dashboard/platform/global.js`; prefer those for API URLs, JSON fetches, common
@@ -137,6 +142,7 @@ Run these after platform changes:
 
 ```sh
 node tests/validate-dashboard-config.mjs
+node --test tests/*.test.mjs
 docker compose config
 docker compose up --build
 ```

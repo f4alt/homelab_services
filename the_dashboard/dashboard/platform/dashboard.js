@@ -2,9 +2,8 @@ import { validateDashboardConfig } from "./config-validator.mjs";
 
 // Global registry (widgets do: window.DASH.registerWidget(...))
 const REGISTRY = new Map();
-const LOADED_TYPES = new Set();
 function registerWidget(type, impl){ REGISTRY.set(type, impl); }
-window.DASH = Object.freeze({ registerWidget, get config(){ return window.DASH_CONFIG; } });
+window.DASH = Object.freeze({ registerWidget });
 
 function renderMessage(grid, { title, lines = [], className = "" }) {
   const element = document.createElement("section");
@@ -42,7 +41,7 @@ function renderWidgetError(element, message) {
 
 // Dynamic import of ../widgets/<type>.js
 async function ensureWidgetTypeLoaded(type) {
-  if (REGISTRY.has(type) || LOADED_TYPES.has(type))
+  if (REGISTRY.has(type))
     // already loaded
     return;
 
@@ -52,7 +51,6 @@ async function ensureWidgetTypeLoaded(type) {
   
   // looks valid; load
   await import(`../widgets/${type}.js`);
-  LOADED_TYPES.add(type);
 }
 
 // Grid helpers (JS sets CSS variables; CSS @media can override)
@@ -173,18 +171,20 @@ async function start(){
       continue;
     }
 
-    const refresh = async () => {
-      try {
-        await impl.update(instance);
-      } catch (e) {
-        renderWidgetError(element, `Update failed: ${String(e?.message || e)}`);
-      }
-    };
-    await refresh();
+    if (typeof impl.update === "function") {
+      const refresh = async () => {
+        try {
+          await impl.update(instance);
+        } catch (e) {
+          renderWidgetError(element, `Update failed: ${String(e?.message || e)}`);
+        }
+      };
+      await refresh();
 
-    // update refresh interval if set
-    if (widg.refreshMs > 0)
-      setInterval(refresh, widg.refreshMs);
+      // update refresh interval if set
+      if (widg.refreshMs > 0)
+        setInterval(refresh, widg.refreshMs);
+    }
   }
 }
 

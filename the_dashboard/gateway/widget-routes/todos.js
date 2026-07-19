@@ -63,15 +63,6 @@ router.post("/todos/sync", async (_req, res) => {
   }
 });
 
-router.get("/todos/sync", async (_req, res) => {
-  try {
-    const payload = await fetchTodo("/sync");
-    return sendOk(res, payload);
-  } catch (err) {
-    return sendUpstreamError(res, err, "Unable to sync todos.");
-  }
-});
-
 router.post("/todos/tasks/update", async (req, res) => {
   const { uid, content, source_file, status } = req.body || {};
 

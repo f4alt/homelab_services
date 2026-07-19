@@ -234,10 +234,6 @@ import { createStack } from "../platform/global.js";
         menu,
         state
       };
-    },
-
-    async update() {
-      // Static interactive widget; no polling needed.
     }
   });
 })();

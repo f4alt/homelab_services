@@ -95,23 +95,6 @@ router.get("/config", async (_req, res) => {
   }
 });
 
-router.post("/config/validate", async (req, res) => {
-  let result;
-  try {
-    result = await validateSource(normalizeSource(req));
-  } catch (err) {
-    return sendError(res, 500, "validation_failed", "Unable to validate dashboard config.", {
-      error: String(err?.message || err)
-    });
-  }
-
-  if (!result.ok) {
-    return sendError(res, 400, "validation_error", "Dashboard config is invalid.", result);
-  }
-
-  return sendOk(res, result);
-});
-
 router.put("/config", async (req, res) => {
   const source = normalizeSource(req);
   let result;
