@@ -56,12 +56,16 @@ widgets for the same concept.
 Current reusable JavaScript primitives include:
 
 - `apiBase()`, `apiUrl()`, and `fetchJson()` for same-origin Gateway calls and
-  the standard response envelope
+  the standard response envelope; `fetchJson()` combines its timeout with an
+  optional caller cancellation signal
 - `createElement()` and `createWidgetMessage()` for safe, concise DOM
   construction
 - `setStateMessage()` for loading, empty, and recoverable error states
 - `createResponsiveGrid()` and `createStack()` for widget-internal layout
-- `createTile()` for the standard tile surface
+- `createTile()` for the standard tile surface, with controlled
+  `--tile-padding`, `--tile-radius`, and `--tile-box-shadow` overrides
+- `createDismissibleMenu()` for per-instance popup state, ARIA expansion,
+  temporary outside-click/Escape listeners, and focus return
 - `createStyledIcon()` for text, emoji, or image icons
 
 Current reusable CSS covers widget and tile surfaces, tiled/full-width/scrolling
@@ -148,12 +152,31 @@ Follow these lifecycle rules:
   once in config, so module-global mutable state must not couple instances.
 - There is currently no unmount hook. Avoid persistent document/window
   listeners and background timers when the shell lifecycle can do the work.
+- Use `createDismissibleMenu()` for listboxes and popup menus that need outside
+  dismissal. Its document listeners exist only while that instance is open.
 - Let unexpected mount/update failures reach the shell so it can isolate the
   failed tile. Render expected loading, empty, offline, and validation states
   inside the widget with `setStateMessage()`.
 
 Widget modules are native browser ES modules. An IIFE is optional and adds no
 isolation beyond module scope. No frontend build or bundling step is expected.
+
+For a dismissible popup, create the controller after the trigger and menu exist:
+
+```js
+const menuController = createDismissibleMenu({
+  trigger: menuButton,
+  menu,
+  containsTarget: (target) => widgetShell.contains(target),
+  onOpenChange: (isOpen) => root.classList.toggle("menu-open", isOpen)
+});
+```
+
+`containsTarget` and `onOpenChange` are optional. Call `open()`, `close()`, or
+`toggle()` from widget interactions and inspect `isOpen()` when widget-specific
+keyboard behavior needs the current state. The controller owns
+`aria-expanded`, the shared `popup-menu-open` class, outside clicks, Escape,
+and focus return.
 
 ## Configuration Contract
 
@@ -192,6 +215,9 @@ Enable the widget in `dashboard/config.js`:
 - Use `createResponsiveGrid()` or `createStack()` for the widget's main content
   and `createTile()` for ordinary tile surfaces. A custom surface should be
   justified by genuinely different semantics or layout.
+- Override a standard tile only through `--tile-padding`, `--tile-radius`, and
+  `--tile-box-shadow`. Keep data layout, field grouping, and domain-state
+  effects in the widget.
 - Use `label`, `label-info`, and `value-large` for the established type scale.
 - Widget-specific CSS may be injected by the widget with an idempotent
   `ensureStyles()` function and a unique style element ID. Scope selectors with
@@ -306,23 +332,18 @@ duplicating handlers/timers, normal empty/error states remain usable, its config
 contains no secrets, its API follows the shared envelope, and its visuals use
 the shared primitives.
 
-## Current Exceptions and Cleanup Candidates
+## Deliberate Exceptions
 
-These existing widgets do not fully follow the preferred mold. They explain the
-current codebase, but they are not precedents to copy blindly.
+The remaining exceptions are constrained by domain or cadence. They are not
+general precedents for new widgets.
 
 | Widget | Difference from the preferred pattern | Guidance for new work |
 | --- | --- | --- |
-| `clocks` | Owns a one-second interval while `refreshMs` is `0`; its `.clock-time` CSS also duplicates the global `value-large` type scale. | The timer is a reasonable sub-refresh exception. Reuse `value-large` rather than copying its typography when touching this widget. |
-| `netstats` | Owns separate IP and ping polling timers, uses silent error catches in places, and its backend lives in `gateway/platform/routes/`. | Multiple cadences justify local timers, but initialization must remain guarded and failures should have visible state. New widget-domain routes belong in `widget-routes/`. Its Gateway placement is historical infrastructure ownership. |
-| `status` | Its backend also lives in `gateway/platform/routes/` even though it has a frontend widget. | Treat status probing and its host policy as existing platform infrastructure. Do not place a new domain route there. |
-| `metar` | Recreates much of the normal tile surface in `.metar-tile` instead of using `createTile()`/`.ui-tile`; fetch failures are collapsed into per-row "no data" output. | Prefer the shared tile primitive and distinguish an unreachable Gateway from valid empty upstream data. |
-| `text` | Can fetch an arbitrary URL directly from the browser and opts out of the Gateway envelope. | Keep this as a lightweight generic/legacy capability. A purpose-built remote integration should use a Gateway companion and the standard envelope. |
-| `search` and `todos` | Attach document-level click listeners, and the platform has no unmount lifecycle to remove them. | Prefer instance-local focus/blur or event handling. Add global listeners only when necessary, once per instance, and do not use them as a general pattern. |
-| `countdown` | Has substantial widget-local visual CSS and overrides some shared tile shadow/padding behavior. | Its domain-specific progress visualization is appropriate locally; shared surface and spacing rules should still be used wherever the design is not countdown-specific. |
+| `clocks` | Owns a one-second interval while `refreshMs` is `0`. | The shell cadence is not suitable for a ticking clock. Initialize the timer once per instance and keep clock typography on the shared `value-large` scale. |
+| `netstats` | Owns separate IP and latency timers while `refreshMs` is `0`. | Independent cadences justify the timers. Each operation has a per-instance in-flight guard, visible stale/recovery state, and no shared mutable polling state. |
+| `countdown` | Keeps specialized progress bars, popup placement, and today/overdue severity glows. | These are domain presentation, while the surface padding and shadow flow through the shared tile customization properties. |
 
-Two placement facts are easy to misread: `todos` is already a proper
-`gateway/widget-routes/` companion, while `status` and `netstats` are the
-historical platform-route exceptions. New widget work should follow `todos` and
-`metar` for route placement, and the shared response helpers used by all of
-them.
+`status`, `netstats`, `metar`, and `todos` all keep their backend companions in
+`gateway/widget-routes/`. `text` is intentionally static. Search and todos use
+the shared dismissible-menu controller rather than persistent document
+listeners.

@@ -71,7 +71,7 @@ do not expose it outside a trusted network.
 
 ## API Contract
 
-Platform-owned Gateway routes use this response envelope:
+All Gateway routes use this response envelope:
 
 ```json
 {
@@ -107,15 +107,14 @@ Current Gateway routes include:
 - `POST /api/todos/sync`
 - `POST /api/todos/tasks/update`
 
-Widget-domain companion routes such as METAR and todos use the same envelope as
-platform-owned routes.
+Widget-domain companions—including status, netstats, METAR, and todos—live in
+`gateway/widget-routes/` and use the same envelope as platform-owned routes.
 
 ## Adding a Widget
 
 See [adding-a-widget.md](adding-a-widget.md) for the expected extension points,
 frontend lifecycle, shared UI and Gateway conventions, test checklist, and the
-existing widgets that intentionally or historically differ from the preferred
-pattern.
+existing widgets that deliberately differ from the preferred pattern.
 
 Dashboard config is validated before widgets load. `PUT /api/config` also
 validates submitted source before replacing `config.js`; malformed or invalid
