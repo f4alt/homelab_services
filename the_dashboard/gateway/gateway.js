@@ -2,8 +2,8 @@ import express from "express";
 import { CONFIG } from "./platform/config.js";
 
 import config from "./platform/routes/config.js";
-import netstats from "./platform/routes/netstats.js";
 import metar from "./widget-routes/metar.js";
+import netstats from "./widget-routes/netstats.js";
 import status from "./widget-routes/status.js";
 import todos from "./widget-routes/todos.js";
 

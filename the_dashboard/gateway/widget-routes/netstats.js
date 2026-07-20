@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { Router } from "express";
-import { CONFIG, hostIsAllowed } from "../config.js";
-import { sendError, sendOk } from "../responses.js";
+import { CONFIG, hostIsAllowed } from "../platform/config.js";
+import { sendError, sendOk } from "../platform/responses.js";
 
 const router = Router();
 
