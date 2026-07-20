@@ -43,9 +43,6 @@ import { fetchJson, createElement } from "../platform/global.js";
     .netstats-status:empty {
       display: none;
     }
-    .netstats-stale {
-      border-color: var(--warn-muted) !important;
-    }
     `;
     document.head.appendChild(s);
   }
@@ -67,7 +64,7 @@ import { fetchJson, createElement } from "../platform/global.js";
   }
 
   function setAvailability(surface, status, stale, message = "") {
-    surface.classList.toggle("netstats-stale", stale);
+    surface.classList.toggle("warn", stale);
     status.textContent = message;
   }
 

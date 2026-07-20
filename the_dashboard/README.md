@@ -71,7 +71,7 @@ do not expose it outside a trusted network.
 
 ## API Contract
 
-All Gateway routes use this response envelope:
+JSON Gateway routes use this response envelope:
 
 ```json
 {
@@ -106,6 +106,10 @@ Current Gateway routes include:
 - `GET /api/todos/tasks`
 - `POST /api/todos/sync`
 - `POST /api/todos/tasks/update`
+
+`GET /api/config` is the intentional exception: it returns the raw JavaScript
+configuration source so the editor and static config script can use the same
+representation.
 
 Widget-domain companions—including status, netstats, METAR, and todos—live in
 `gateway/widget-routes/` and use the same envelope as platform-owned routes.

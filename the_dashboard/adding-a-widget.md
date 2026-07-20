@@ -176,7 +176,8 @@ const menuController = createDismissibleMenu({
 `toggle()` from widget interactions and inspect `isOpen()` when widget-specific
 keyboard behavior needs the current state. The controller owns
 `aria-expanded`, the shared `popup-menu-open` class, outside clicks, Escape,
-and focus return.
+and focus return on Escape. A selection handler that rebuilds its option nodes
+should return focus to a stable trigger or input after rendering.
 
 ## Configuration Contract
 

@@ -89,6 +89,7 @@ import {
         state.selectedList = key;
         closeMenu(state);
         render(state);
+        state.listButton.focus();
       });
       state.menu.appendChild(item);
     }

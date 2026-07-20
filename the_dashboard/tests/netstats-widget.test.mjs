@@ -261,9 +261,9 @@ test("netstats preserves readings through failures and clears stale state after 
     assert.match(instance.ipStatus.textContent, /showing previous value/);
     assert.match(instance.pingStatus.textContent, /showing previous samples/);
     assert.match(instance.speedStatus.textContent, /showing previous result/);
-    assert.equal(instance.rowIP.classList.contains("netstats-stale"), true);
-    assert.equal(instance.chartWrap.classList.contains("netstats-stale"), true);
-    assert.equal(instance.speedBlock.classList.contains("netstats-stale"), true);
+    assert.equal(instance.rowIP.classList.contains("warn"), true);
+    assert.equal(instance.chartWrap.classList.contains("warn"), true);
+    assert.equal(instance.speedBlock.classList.contains("warn"), true);
     assert.equal(instance.speedBlock.getAttribute("aria-busy"), "false");
 
     intervalCallbacks[0]();
@@ -277,9 +277,9 @@ test("netstats preserves readings through failures and clears stale state after 
     assert.equal(instance.ipStatus.textContent, "");
     assert.equal(instance.pingStatus.textContent, "");
     assert.equal(instance.speedStatus.textContent, "");
-    assert.equal(instance.rowIP.classList.contains("netstats-stale"), false);
-    assert.equal(instance.chartWrap.classList.contains("netstats-stale"), false);
-    assert.equal(instance.speedBlock.classList.contains("netstats-stale"), false);
+    assert.equal(instance.rowIP.classList.contains("warn"), false);
+    assert.equal(instance.chartWrap.classList.contains("warn"), false);
+    assert.equal(instance.speedBlock.classList.contains("warn"), false);
 
     instance.chartWrap.fire("click");
     assert.equal(instance.chartWrap.getAttribute("aria-pressed"), "true");

@@ -320,6 +320,7 @@ test("todos installs dismissal listeners only while its list picker is open", as
     instance.menu.children[1].fire("click");
     assert.equal(instance.selectedList, "beta.org");
     assert.equal(instance.listButton.getAttribute("aria-expanded"), "false");
+    assert.equal(instance.listButton.focusCalls, 1);
     assert.equal(fakeDocument.listenerCount("click"), 0);
 
     instance.menuController.open();

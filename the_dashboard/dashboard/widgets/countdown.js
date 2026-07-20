@@ -412,6 +412,15 @@ import {
         return;
       state.lastTickMin = uniqueMinuteKey;
 
+      const orderedTiles = sortEventsByRelevance(
+        state.tiles.map((tile) => ({ date: tile.evDate, tile })),
+        now
+      ).map((entry) => entry.tile);
+      if (orderedTiles.some((tile, index) => tile !== state.tiles[index])) {
+        state.tiles = orderedTiles;
+        for (const tile of state.tiles) state.wrap.appendChild(tile.card);
+      }
+
       for (const t of state.tiles) {
         updateCountdownTile(t, t.evDate, t.evLabel, now);
       }
