@@ -128,6 +128,48 @@ test("Search registers as a static widget without a no-op update", async () => {
   }
 });
 
+test("Text renders configured text without registering network updates", async () => {
+  const previous = {
+    document: globalThis.document,
+    fetch: globalThis.fetch,
+    window: globalThis.window
+  };
+  let fetchCalls = 0;
+  let registration;
+
+  globalThis.document = {
+    createElement: (tagName) => new FakeElement(tagName)
+  };
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("Text widgets must not fetch.");
+  };
+  globalThis.window = {
+    DASH: {
+      registerWidget(type, implementation) {
+        registration = { type, implementation };
+      }
+    }
+  };
+
+  try {
+    await import(`../dashboard/widgets/text.js?test=${Date.now()}`);
+    const root = new FakeElement("section");
+    const state = registration.implementation.mount(root, {
+      props: { text: "Calendar placeholder", fetchUrl: "https://example.invalid/feed" }
+    });
+
+    assert.equal(registration.type, "text");
+    assert.equal(typeof registration.implementation.update, "undefined");
+    assert.equal(state.body.textContent, "Calendar placeholder");
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.document = previous.document;
+    globalThis.fetch = previous.fetch;
+    globalThis.window = previous.window;
+  }
+});
+
 test("dashboard config keeps network status and intentional placeholders", async () => {
   const source = await readFile(new URL("../dashboard/config.js", import.meta.url), "utf8");
   const context = vm.createContext({ window: {} });

@@ -1,4 +1,4 @@
-import { createElement, fetchJson } from "../platform/global.js";
+import { createElement } from "../platform/global.js";
 
 window.DASH.registerWidget("text", {
   mount(root, { props = {} }) {
@@ -6,11 +6,5 @@ window.DASH.registerWidget("text", {
     body.textContent = props.text ?? "";
     root.replaceChildren(body);
     return { body, props };
-  },
-
-  async update(state) {
-    if (!state.props?.fetchUrl) return;
-    const data = await fetchJson(state.props.fetchUrl, { envelope: false });
-    state.body.textContent = typeof data === "string" ? data : JSON.stringify(data);
   }
 });
