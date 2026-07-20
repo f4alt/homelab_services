@@ -1,4 +1,4 @@
-import { createStack } from "../platform/global.js";
+import { createDismissibleMenu, createStack } from "../platform/global.js";
 
 (function () {
   function ensureStyles() {
@@ -79,15 +79,14 @@ import { createStack } from "../platform/global.js";
   }
 
   window.DASH.registerWidget("search", {
-    mount(root, { props }) {
+    mount(root, { id, props }) {
       ensureStyles();
       root.classList.add("search-widget");
 
       const engines = getEnginesFromProps(props);
       const state = {
         engines,
-        currentIdx: 0,
-        menuOpen: false
+        currentIdx: 0
       };
 
       const wrapper = createStack();
@@ -107,16 +106,29 @@ import { createStack } from "../platform/global.js";
       engineBtn.className = "search-engine-btn menu-button";
       engineBtn.type = "button";
       engineBtn.textContent = engines[state.currentIdx].name;
+      engineBtn.setAttribute("aria-haspopup", "listbox");
 
       // dropdown menu
       const menu = document.createElement("div");
       menu.className = "popup popup-menu search-engine-menu";
+      menu.id = `${id}-engine-menu`;
+      menu.setAttribute("role", "listbox");
+      engineBtn.setAttribute("aria-controls", menu.id);
+
+      const menuController = createDismissibleMenu({
+        trigger: engineBtn,
+        menu,
+        containsTarget: (target) => pill.contains(target),
+        onOpenChange: (isOpen) => root.classList.toggle("search-menu-open", isOpen)
+      });
 
       // populate engine list
-      engines.forEach((eng, idx) => {
+      const menuItems = engines.map((eng, idx) => {
         const item = document.createElement("button");
         item.className = "clickable popup-menu-item";
         item.type = "button";
+        item.setAttribute("role", "option");
+        item.setAttribute("aria-selected", String(idx === state.currentIdx));
 
         const nm = document.createElement("span");
         nm.className = "label";
@@ -128,12 +140,16 @@ import { createStack } from "../platform/global.js";
           e.stopPropagation();
           state.currentIdx = idx;
           engineBtn.textContent = eng.name;
-          closeMenu();
+          menuItems.forEach((menuItem, menuIndex) => {
+            menuItem.setAttribute("aria-selected", String(menuIndex === state.currentIdx));
+          });
+          menuController.close();
           // DO NOT activate border here; border = input focus only
           input.focus();
         });
 
         menu.appendChild(item);
+        return item;
       });
 
       function activateBorder() {
@@ -144,34 +160,9 @@ import { createStack } from "../platform/global.js";
         pill.classList.remove("search-pill-active");
       }
 
-      function openMenu() {
-        state.menuOpen = true;
-        root.classList.add("search-menu-open");
-        menu.classList.add("popup-menu-open");
-
-        document.addEventListener("click", outsideHandler);
-      }
-
-      function closeMenu() {
-        state.menuOpen = false;
-        root.classList.remove("search-menu-open");
-        menu.classList.remove("popup-menu-open");
-        document.removeEventListener("click", outsideHandler);
-      }
-
-      // Outside click closes menu, but doesn't touch border
-      function outsideHandler(ev) {
-        if (pill.contains(ev.target)) return;
-        closeMenu();
-      }
-
       engineBtn.addEventListener("click", (evt) => {
         evt.stopPropagation();
-        if (state.menuOpen) {
-          closeMenu();
-        } else {
-          openMenu();
-        }
+        menuController.toggle();
       });
 
       function submitQuery() {
@@ -192,8 +183,8 @@ import { createStack } from "../platform/global.js";
           evt.preventDefault();
           submitQuery();
         } else if (evt.key === "Escape") {
-          if (state.menuOpen) {
-            closeMenu();
+          if (menuController.isOpen()) {
+            menuController.close();
           } else {
             // leaving focus will drop the active border via blur handler
             input.blur();
@@ -232,6 +223,7 @@ import { createStack } from "../platform/global.js";
         input,
         engineBtn,
         menu,
+        menuController,
         state
       };
     }

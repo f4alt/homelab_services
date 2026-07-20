@@ -97,6 +97,58 @@ export function createTile(className = "") {
   return createElement("div", `ui-tile ${className}`.trim());
 }
 
+export function createDismissibleMenu({
+  trigger,
+  menu,
+  containsTarget = (target) => trigger.contains(target) || menu.contains(target),
+  onOpenChange = () => {}
+}) {
+  let open = false;
+
+  function onDocumentClick(event) {
+    if (!containsTarget(event.target)) close();
+  }
+
+  function onDocumentKeydown(event) {
+    if (event.key !== "Escape") return;
+    close();
+    trigger.focus();
+  }
+
+  function setOpen(nextOpen) {
+    const next = Boolean(nextOpen);
+    if (next === open) return;
+
+    open = next;
+    trigger.setAttribute("aria-expanded", String(open));
+    menu.classList.toggle("popup-menu-open", open);
+
+    if (open) {
+      document.addEventListener("click", onDocumentClick);
+      document.addEventListener("keydown", onDocumentKeydown);
+    } else {
+      document.removeEventListener("click", onDocumentClick);
+      document.removeEventListener("keydown", onDocumentKeydown);
+    }
+
+    onOpenChange(open);
+  }
+
+  function close() {
+    setOpen(false);
+  }
+
+  trigger.setAttribute("aria-expanded", "false");
+  menu.classList.remove("popup-menu-open");
+
+  return Object.freeze({
+    close,
+    isOpen: () => open,
+    open: () => setOpen(true),
+    toggle: () => setOpen(!open)
+  });
+}
+
 export function createStyledIcon(icon) {
   const iconBox = createElement("div", "icon");
 
