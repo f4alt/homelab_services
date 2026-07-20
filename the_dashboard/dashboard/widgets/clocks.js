@@ -10,11 +10,6 @@ import { createResponsiveGrid, createTile, setStateMessage } from "../platform/g
       display: grid;
       grid-template-columns: 1fr auto;
     }
-
-    .clock-time {
-      font-size: 25px;
-      font-weight: 500;
-    }
     `;
     document.head.appendChild(s);
   }
@@ -63,7 +58,7 @@ import { createResponsiveGrid, createTile, setStateMessage } from "../platform/g
     const card = createTile("clock-tile");
 
     const timeEl = document.createElement("div");
-    timeEl.className = "label clock-time";
+    timeEl.className = "value-large";
 
     const labelEl = document.createElement("div");
     labelEl.className = "label";

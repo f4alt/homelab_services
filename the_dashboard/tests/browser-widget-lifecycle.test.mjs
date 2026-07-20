@@ -170,6 +170,41 @@ test("Text renders configured text without registering network updates", async (
   }
 });
 
+test("Clocks use the shared large-value typography for time", async () => {
+  const previous = {
+    document: globalThis.document,
+    window: globalThis.window
+  };
+  let registration;
+  const head = new FakeElement("head");
+  globalThis.document = {
+    createElement: (tagName) => new FakeElement(tagName),
+    getElementById: () => null,
+    head
+  };
+  globalThis.window = {
+    DASH: {
+      registerWidget(type, implementation) {
+        registration = { type, implementation };
+      }
+    }
+  };
+
+  try {
+    await import(`../dashboard/widgets/clocks.js?test=${Date.now()}`);
+    const root = new FakeElement("section");
+    const state = registration.implementation.mount(root, {
+      props: { zones: [{ label: "UTC", tz: "UTC" }] }
+    });
+
+    assert.equal(registration.type, "clocks");
+    assert.match(state.cards[0].timeEl.className, /(^|\s)value-large(\s|$)/);
+  } finally {
+    globalThis.document = previous.document;
+    globalThis.window = previous.window;
+  }
+});
+
 test("dashboard config keeps network status and intentional placeholders", async () => {
   const source = await readFile(new URL("../dashboard/config.js", import.meta.url), "utf8");
   const context = vm.createContext({ window: {} });
