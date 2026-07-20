@@ -1,4 +1,9 @@
-import { createElement, fetchJson, setStateMessage } from "../platform/global.js";
+import {
+  createDismissibleMenu,
+  createElement,
+  fetchJson,
+  setStateMessage
+} from "../platform/global.js";
 
 (function () {
   function ensureStyles() {
@@ -66,8 +71,7 @@ import { createElement, fetchJson, setStateMessage } from "../platform/global.js
   }
 
   function closeMenu(state) {
-    state.menu.classList.remove("popup-menu-open");
-    state.listButton.setAttribute("aria-expanded", "false");
+    state.menuController.close();
   }
 
   function renderMenu(state) {
@@ -222,19 +226,18 @@ import { createElement, fetchJson, setStateMessage } from "../platform/global.js
       };
 
       showAllInput.checked = state.showAll;
+      state.menuController = createDismissibleMenu({
+        trigger: listButton,
+        menu,
+        containsTarget: (target) => shell.contains(target)
+      });
       listButton.addEventListener("click", () => {
-        const isOpen = !menu.classList.contains("popup-menu-open");
-        menu.classList.toggle("popup-menu-open", isOpen);
-        listButton.setAttribute("aria-expanded", String(isOpen));
+        state.menuController.toggle();
       });
       showAllInput.addEventListener("change", () => {
         state.showAll = showAllInput.checked;
         render(state);
       });
-      document.addEventListener("click", (event) => {
-        if (!shell.contains(event.target)) closeMenu(state);
-      });
-
       setStateMessage(list, "Loading todos...", "loading");
       return state;
     },

@@ -262,6 +262,77 @@ test("search exposes one dismissible listbox and preserves engine selection and 
   }
 });
 
+test("todos installs dismissal listeners only while its list picker is open", async () => {
+  const previous = {
+    document: globalThis.document,
+    fetch: globalThis.fetch,
+    window: globalThis.window
+  };
+  const fakeDocument = new FakeDocument();
+  let registration;
+  globalThis.document = fakeDocument;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return {
+        ok: true,
+        data: {
+          tasks: [
+            { uid: "a", content: "First task", source_file: "alpha.org", status: "TODO" },
+            { uid: "b", content: "Second task", source_file: "beta.org", status: "TODO" }
+          ]
+        },
+        error: null
+      };
+    }
+  });
+  globalThis.window = {
+    DASH_CONFIG: { apiBase: "/api" },
+    DASH: {
+      registerWidget(type, implementation) {
+        registration = { type, implementation };
+      }
+    }
+  };
+
+  try {
+    await import(`../dashboard/widgets/todos.js?test=${Date.now()}`);
+    const root = new FakeElement("section");
+    const instance = registration.implementation.mount(root, {
+      id: "todos_test",
+      props: { defaultList: "alpha.org" }
+    });
+
+    assert.equal(registration.type, "todos");
+    assert.equal(instance.listButton.tagName, "button");
+    assert.equal(instance.listButton.getAttribute("aria-haspopup"), "listbox");
+    assert.equal(instance.listButton.getAttribute("aria-expanded"), "false");
+    assert.equal(fakeDocument.listenerCount("click"), 0);
+
+    await registration.implementation.update(instance);
+    assert.equal(instance.selectedList, "alpha.org");
+    assert.equal(instance.menu.children.length, 2);
+
+    instance.listButton.fire("click");
+    assert.equal(instance.listButton.getAttribute("aria-expanded"), "true");
+    assert.equal(fakeDocument.listenerCount("click"), 1);
+
+    instance.menu.children[1].fire("click");
+    assert.equal(instance.selectedList, "beta.org");
+    assert.equal(instance.listButton.getAttribute("aria-expanded"), "false");
+    assert.equal(fakeDocument.listenerCount("click"), 0);
+
+    instance.menuController.open();
+    fakeDocument.fire("click", { target: new FakeElement("aside") });
+    assert.equal(instance.menuController.isOpen(), false);
+    assert.equal(fakeDocument.listenerCount("click"), 0);
+  } finally {
+    globalThis.document = previous.document;
+    globalThis.fetch = previous.fetch;
+    globalThis.window = previous.window;
+  }
+});
+
 test("dismissible menus keep instance state independent and dismiss outside or on Escape", () => {
   const previousDocument = globalThis.document;
   const fakeDocument = new FakeDocument();
