@@ -183,6 +183,7 @@ check("network ping route works through gateway", async () => {
   assert(json?.ok === true, "ping response did not report ok=true");
   assert(json?.error === null, "ping response should not include an error");
   assert(json?.data?.target === "localhost", "ping target did not round-trip");
+  assert(!Object.hasOwn(json?.data || {}, "ok"), "ping data should not repeat the envelope ok flag");
 });
 
 check("network ping route rejects disallowed targets", async () => {

@@ -109,7 +109,7 @@ router.get("/net/ping", async (req, res) => {
 
   try {
     const ms = await pingOnce(target);
-    return sendOk(res, { ok: true, target, ms });
+    return sendOk(res, { target, ms });
   } catch (err) {
     return sendError(res, 500, "upstream_error", String(err?.message || err));
   }
@@ -124,7 +124,6 @@ router.get("/net/speedtest", async (_req, res) => {
   try {
     const raw = await runSpeedtestCli();
     return sendOk(res, {
-      ok: true,
       ping_ms: raw.ping,
       download_mbps: raw.download / 1e6,
       upload_mbps: raw.upload / 1e6,
