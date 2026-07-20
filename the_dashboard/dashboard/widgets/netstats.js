@@ -23,18 +23,52 @@ import { fetchJson, createElement } from "../platform/global.js";
     .netstats-speed-block {
       display: flex;
       flex-direction: column;
+      font: inherit;
       gap: var(--gap);
+      text-align: initial;
+      width: 100%;
+    }
+    .netstats-chart-button {
+      appearance: none;
+      color: inherit;
+      font: inherit;
+      position: relative;
+      width: 100%;
+    }
+    .netstats-status {
+      display: block;
+      margin-top: 4px;
+      white-space: normal;
+    }
+    .netstats-status:empty {
+      display: none;
+    }
+    .netstats-stale {
+      border-color: var(--warn-muted) !important;
     }
     `;
     document.head.appendChild(s);
   }
 
-  function createMetricRow(label, value = "-") {
-    const row = createElement("div", "metric-row metric-row--nowrap");
-    const labelEl = createElement("div", "label", label);
-    const valueEl = createElement("div", "label-info", value);
+  function createMetricRow(label, value = "-", tagName = "div") {
+    const childTag = tagName === "span" ? "span" : "div";
+    const row = createElement(tagName, "metric-row metric-row--nowrap");
+    const labelEl = createElement(childTag, "label", label);
+    const valueEl = createElement(childTag, "label-info", value);
     row.append(labelEl, valueEl);
     return { row, labelEl, valueEl };
+  }
+
+  function createStatus() {
+    const status = createElement("span", "label-info netstats-status");
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    return status;
+  }
+
+  function setAvailability(surface, status, stale, message = "") {
+    surface.classList.toggle("netstats-stale", stale);
+    status.textContent = message;
   }
 
   function formatMillis(ms) {
@@ -51,18 +85,17 @@ import { fetchJson, createElement } from "../platform/global.js";
   }
 
 
-  async function fetchClientIP(signal) {
-    try {
-      const data = await fetchJson("/net/myip", { fetchOptions: { signal } });
-      return data?.ip || "—";
-    } catch {}
-
-    return "—";
+  async function fetchClientIP() {
+    const data = await fetchJson("/net/myip");
+    if (!data?.ip) throw new Error("Public IP was unavailable.");
+    return data.ip;
   }
 
   async function wanPingOnce() {
     const data = await fetchJson("/net/ping");
-    return Number(data?.ms ?? data?.ping_ms ?? 1000);
+    const milliseconds = Number(data?.ms ?? data?.ping_ms);
+    if (!Number.isFinite(milliseconds)) throw new Error("Latency was unavailable.");
+    return milliseconds;
   }
 
   function computeJitter(samples) {
@@ -157,37 +190,30 @@ import { fetchJson, createElement } from "../platform/global.js";
   async function runBothSpeeds(state) {
     if (state.running) return;
     state.running = true;
-  
+
     // pause ping polling while running speed test
-    let ping_running = state.paused;
+    const wasPaused = state.paused;
     state.paused = true;
-  
-    const block = state.speedBlock;
-  
-    block.setAttribute("aria-busy", "true");
-    state.valDL.textContent = "...";
-    state.valUL.textContent = "...";
-    state.valPing.textContent = "...";
-  
+
+    state.speedBlock.setAttribute("aria-busy", "true");
+    state.speedStatus.textContent = "Running speed test…";
+
     try {
-      state.speedBlock.classList.remove("error");
-      const j = await fetchJson("/net/speedtest", { timeoutMs: 185000 });
-  
-      const dl = Number(j.download_mbps);
-      const ul = Number(j.upload_mbps);
-  
-      state.valDL.textContent = formatMbps(dl);
-      state.valUL.textContent = formatMbps(ul);
-      state.valPing.textContent = formatMillis(j.ping_ms);
+      const data = await fetchJson("/net/speedtest", { timeoutMs: 185000 });
+      state.valDL.textContent = formatMbps(data.download_mbps);
+      state.valUL.textContent = formatMbps(data.upload_mbps);
+      state.valPing.textContent = formatMillis(data.ping_ms);
+      state.hasSpeedResult = true;
+      setAvailability(state.speedBlock, state.speedStatus, false);
     } catch {
-      state.valDL.textContent = "err";
-      state.valUL.textContent = "err";
-      state.valPing.textContent = "err";
-      state.speedBlock.classList.add("error");
+      const message = state.hasSpeedResult
+        ? "Speed test unavailable; showing previous result."
+        : "Speed test unavailable.";
+      setAvailability(state.speedBlock, state.speedStatus, true, message);
     } finally {
-      block.setAttribute("aria-busy", "false");
+      state.speedBlock.setAttribute("aria-busy", "false");
       state.running = false;
-      state.paused = ping_running;
+      state.paused = wasPaused;
     }
   }
 
@@ -202,49 +228,71 @@ import { fetchJson, createElement } from "../platform/global.js";
       if (state.paused) {
         state.svg.classList.add("paused");
         state.overlay.textContent = "⏸";
+        state.chartWrap.setAttribute("aria-label", "Resume latency polling");
       } else {
         state.svg.classList.remove("paused");
         state.overlay.textContent = "";
+        state.chartWrap.setAttribute("aria-label", "Pause latency polling");
       }
+      state.chartWrap.setAttribute("aria-pressed", String(state.paused));
     };
 
     state.chartWrap.addEventListener("click", togglePause);
   }
 
-  function startIpPolling(state) {
-    // initial fetch
-    (async () => {
-      try {
-        state.valIP.textContent = await fetchClientIP();
-      } catch {
-        state.valIP.textContent = "—";
-      }
-    })();
+  async function refreshIp(state) {
+    if (state.ipInFlight) return;
+    state.ipInFlight = true;
+    state.rowIP.setAttribute("aria-busy", "true");
 
-    state.ipTimer = setInterval(async () => {
-      try {
-        state.valIP.textContent = await fetchClientIP();
-      } catch {
-        // ignore
+    try {
+      state.valIP.textContent = await fetchClientIP();
+      state.hasIpResult = true;
+      setAvailability(state.rowIP, state.ipStatus, false);
+    } catch {
+      const message = state.hasIpResult
+        ? "Public IP unavailable; showing previous value."
+        : "Public IP unavailable.";
+      setAvailability(state.rowIP, state.ipStatus, true, message);
+    } finally {
+      state.rowIP.setAttribute("aria-busy", "false");
+      state.ipInFlight = false;
+    }
+  }
+
+  async function refreshPing(state) {
+    if (state.paused || state.pingInFlight) return;
+    state.pingInFlight = true;
+    state.chartWrap.setAttribute("aria-busy", "true");
+
+    try {
+      const milliseconds = await wanPingOnce();
+      state.samples.push(milliseconds);
+      if (state.samples.length > state.cfg.maxSamples) {
+        state.samples.shift();
       }
-    }, state.cfg.ipRefreshMs);
+      renderSparkline(state.svg, state.samples);
+      state.rJitter.textContent = `jitter: ${computeJitter(state.samples)} ms`;
+      state.hasPingResult = true;
+      setAvailability(state.chartWrap, state.pingStatus, false);
+    } catch {
+      const message = state.hasPingResult
+        ? "Latency unavailable; showing previous samples."
+        : "Latency unavailable.";
+      setAvailability(state.chartWrap, state.pingStatus, true, message);
+    } finally {
+      state.chartWrap.setAttribute("aria-busy", "false");
+      state.pingInFlight = false;
+    }
+  }
+
+  function startIpPolling(state) {
+    void refreshIp(state);
+    state.ipTimer = setInterval(() => void refreshIp(state), state.cfg.ipRefreshMs);
   }
 
   function startPingPolling(state) {
-    state.pingTimer = setInterval(async () => {
-      try {
-        if (state.paused) return;
-        const ms = await wanPingOnce();
-        state.samples.push(ms);
-        if (state.samples.length > state.cfg.maxSamples) {
-          state.samples.shift();
-        }
-        renderSparkline(state.svg, state.samples);
-        state.rJitter.textContent = "jitter: " + computeJitter(state.samples) + " ms";
-      } catch {
-        // drop sample on error
-      }
-    }, state.cfg.pingIntervalMs);
+    state.pingTimer = setInterval(() => void refreshPing(state), state.cfg.pingIntervalMs);
   }
 
   window.DASH.registerWidget("netstats", {
@@ -267,27 +315,32 @@ import { fetchJson, createElement } from "../platform/global.js";
 
       // IP row
       const { row: rowIP, valueEl: valIP } = createMetricRow("Public IP", "—");
+      const ipStatus = createStatus();
 
       // clickable block for download / upload speed
-      const speedBlock = document.createElement("div");
+      const speedBlock = document.createElement("button");
+      speedBlock.type = "button";
       speedBlock.className = "netstats-speed-block clickable";
-      speedBlock.setAttribute("role","button");
-      speedBlock.tabIndex = 0;
+      speedBlock.setAttribute("aria-busy", "false");
+      speedBlock.setAttribute("aria-label", "Run network speed test");
 
-      const { row: rowDL, valueEl: valDL } = createMetricRow("Download", "-");
-      const { row: rowUL, valueEl: valUL } = createMetricRow("Upload", "-");
-      const { row: rowPing, valueEl: valPing } = createMetricRow("Ping", "-");
+      const { row: rowDL, valueEl: valDL } = createMetricRow("Download", "-", "span");
+      const { row: rowUL, valueEl: valUL } = createMetricRow("Upload", "-", "span");
+      const { row: rowPing, valueEl: valPing } = createMetricRow("Ping", "-", "span");
+      const speedStatus = createStatus();
 
       speedBlock.appendChild(rowDL);
       speedBlock.appendChild(rowUL);
       speedBlock.appendChild(rowPing);
+      speedBlock.appendChild(speedStatus);
 
       left.appendChild(rowIP);
+      left.appendChild(ipStatus);
       left.appendChild(speedBlock);
 
       // RIGHT - latency graph
       const right = document.createElement("div");
-      right.className = "panel-main clickable";
+      right.className = "panel-main";
 
       // labels
       const labels = document.createElement("div");
@@ -302,19 +355,24 @@ import { fetchJson, createElement } from "../platform/global.js";
       labels.appendChild(rJitter);
 
       // latency graph
-      const chartWrap = document.createElement("div");
-      chartWrap.className = "net-chart-wrap";
-      chartWrap.tabIndex = 0;
+      const chartWrap = document.createElement("button");
+      chartWrap.type = "button";
+      chartWrap.className = "net-chart-wrap netstats-chart-button clickable";
+      chartWrap.setAttribute("aria-busy", "false");
+      chartWrap.setAttribute("aria-label", "Pause latency polling");
+      chartWrap.setAttribute("aria-pressed", "false");
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.classList.add("net-chart");
-      const overlay = document.createElement("div");
+      const overlay = document.createElement("span");
       overlay.className = "center-overlay net-chart-overlay";
       overlay.textContent = "";
       chartWrap.appendChild(svg);
       chartWrap.appendChild(overlay);
+      const pingStatus = createStatus();
 
       right.appendChild(chartWrap);
       right.appendChild(labels);
+      right.appendChild(pingStatus);
 
       // assemble
       wrap.appendChild(left);
@@ -323,17 +381,23 @@ import { fetchJson, createElement } from "../platform/global.js";
 
       return {
         cfg, root, wrap,
-        valIP, speedBlock, valDL, valUL, valPing,
-        chartWrap, svg, overlay, rJitter,
+        rowIP, valIP, ipStatus,
+        speedBlock, valDL, valUL, valPing, speedStatus,
+        chartWrap, svg, overlay, rJitter, pingStatus,
         ipTimer: null, pingTimer: null,
         samples: [],
         paused: false,
-        running: false
+        running: false,
+        ipInFlight: false,
+        pingInFlight: false,
+        hasIpResult: false,
+        hasPingResult: false,
+        hasSpeedResult: false
       };
     },
 
     async update(state) {
-      if (state.ipTimer)
+      if (state.ipTimer !== null)
         return;   // only attach once
 
       attachSpeedBlockHandlers(state);
