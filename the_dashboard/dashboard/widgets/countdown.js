@@ -1,4 +1,10 @@
 import { createStack, createTile, setStateMessage } from "../platform/global.js";
+import {
+  diffDaysSigned,
+  minuteIdentity,
+  sortEventsByRelevance,
+  startOfDay
+} from "./countdown-domain.js";
 
 (function () {
   function ensureCountdownStyles() {
@@ -65,12 +71,7 @@ import { createStack, createTile, setStateMessage } from "../platform/global.js"
     document.head.appendChild(s);
   }
 
-  const DAY_MS = 24 * 60 * 60 * 1000;
   const YEAR_DAYS = 365;
-
-  function startOfDay(d) {
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0,0,0,0);
-  }
 
   // recurring helper for MM/DD-style events:
   function nextOccurrenceOfMonthDay(mm, dd) {
@@ -116,14 +117,6 @@ import { createStack, createTile, setStateMessage } from "../platform/global.js"
     }
 
     return null;
-  }
-
-  // signed day difference target - now:
-  //  >0 future, 0 today, <0 overdue
-  function diffDaysSigned(target, now) {
-    const ms = startOfDay(target) - startOfDay(now);
-    if (ms === 0) return 0;
-    return Math.round(ms / DAY_MS);
   }
 
   function etaStrings(daysDelta) {
@@ -234,26 +227,6 @@ import { createStack, createTile, setStateMessage } from "../platform/global.js"
       .sort((a, b) => a.date - b.date);
     const n = Math.max(1, opts.federalCount || 1);
     return fut.slice(0, n);
-  }
-
-  // We want "most relevant right now" first.
-  // rank:
-  //   0 -> today
-  //   1 -> future
-  //   2 -> overdue
-  //
-  // absDays sorts within each rank:
-  //   for future: sooner first
-  //   for overdue: most recently missed first
-  function distanceRank(dateObj, now) {
-    const delta = diffDaysSigned(dateObj, now);
-    if (delta === 0) {
-      return { rank: 0, absDays: 0, delta };
-    }
-    if (delta > 0) {
-      return { rank: 2, absDays: delta, delta };
-    }
-    return { rank: 1, absDays: Math.abs(delta), delta };
   }
 
   function createCountdownTile() {
@@ -395,19 +368,7 @@ import { createStack, createTile, setStateMessage } from "../platform/global.js"
       }
     }
 
-    const merged = [...mergedMap.values()];
-
-    // sort by relevance to now:
-    //    today (rank0), then future soon, then overdue recent.
-    merged.sort((a, b) => {
-      const A = distanceRank(a.date, now);
-      const B = distanceRank(b.date, now);
-      if (A.rank !== B.rank) return A.rank - B.rank;
-      if (A.absDays !== B.absDays) return A.absDays - B.absDays;
-      return a.date - b.date;
-    });
-
-    return merged;
+    return sortEventsByRelevance(mergedMap.values(), now);
   }
 
   window.DASH.registerWidget("countdown", {
@@ -445,12 +406,7 @@ import { createStack, createTile, setStateMessage } from "../platform/global.js"
       const now = new Date();
 
       // throttle to once per minute
-      const uniqueMinuteKey =
-        now.getUTCFullYear()   * 525600 +
-        now.getUTCMonth()      * 43200  +
-        now.getUTCDate()       * 1440   +
-        now.getUTCHours()      * 60     +
-        now.getUTCMinutes();
+      const uniqueMinuteKey = minuteIdentity(now);
 
       if (state.lastTickMin === uniqueMinuteKey)
         return;
