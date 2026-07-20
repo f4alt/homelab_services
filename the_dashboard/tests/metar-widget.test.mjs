@@ -117,6 +117,22 @@ test("METAR renders Gateway failure details and recovers the existing station ro
     });
     const originalRow = instance.rows.KDFW;
 
+    assert.equal(originalRow.tile.classList.contains("ui-tile"), true);
+    assert.deepEqual(
+      originalRow.tile.children.map((child) => child.className),
+      [
+        "label metar-field metar-station",
+        "label-info metar-field metar-time",
+        "label-info metar-field metar-wind",
+        "label-info metar-field metar-visibility",
+        "label-info metar-field metar-weather",
+        "label-info metar-field metar-sky",
+        "label-info metar-field metar-temperature",
+        "label-info metar-field metar-altimeter",
+        "label-info metar-field metar-remarks"
+      ]
+    );
+
     await registration.implementation.update(instance);
     assert.equal(originalRow.station.textContent, "KDFW");
     assert.equal(originalRow.timestampSpan.textContent, "ERR");

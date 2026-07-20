@@ -1,4 +1,4 @@
-import { createStack, fetchJson, setStateMessage } from "../platform/global.js";
+import { createStack, createTile, fetchJson, setStateMessage } from "../platform/global.js";
 import { formatMetarEntry, metarGatewayFailure } from "./metar-domain.js";
 
 (function () {
@@ -8,58 +8,89 @@ import { formatMetarEntry, metarGatewayFailure } from "./metar-domain.js";
     s.id = "metar-widget-styles";
     s.textContent = `
     .metar-tile {
-      background-color: var(--tile);
-      display: grid;
-      grid-template-columns: 6ch 6ch 10ch 6ch 5ch .4fr 5ch 6ch 1fr;
       align-items: center;
-      padding: var(--widget-padding);
-      border-radius: var(--radius);
-      overflow: auto;
+      display: grid;
+      gap: 6px 10px;
+      grid-template-columns:
+        minmax(5ch, .55fr)
+        minmax(7ch, .7fr)
+        minmax(11ch, 1fr)
+        minmax(6ch, .65fr)
+        minmax(4ch, .55fr)
+        minmax(7ch, 1fr)
+        minmax(6ch, .65fr)
+        minmax(6ch, .65fr)
+        minmax(8ch, 1.4fr);
+    }
+
+    .metar-field {
+      min-width: 0;
+    }
+
+    .metar-remarks,
+    .metar-sky {
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    @media (max-width: 720px) {
+      .metar-tile {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .metar-remarks {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .metar-tile {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
     `;
     document.head.appendChild(s);
   }
 
   function createMetarTile(stationId) {
-    const tile = document.createElement("div");
-    tile.className = "metar-tile";
+    const tile = createTile("metar-tile");
 
     // Kxxx
     const station = document.createElement("div");
-    station.className = "label";
+    station.className = "label metar-field metar-station";
     station.textContent = stationId;
 
     // ddhhmmZ
     const timestampSpan = document.createElement("span");
-    timestampSpan.className = "label-info";
+    timestampSpan.className = "label-info metar-field metar-time";
 
     // 123@45KT
     const windSpan = document.createElement("span");
-    windSpan.className = "label-info";
+    windSpan.className = "label-info metar-field metar-wind";
 
     // 10+SM
     const visSpan = document.createElement("span");
-    visSpan.className = "label-info";
+    visSpan.className = "label-info metar-field metar-visibility";
 
     // (optional) RA | HZ
     const wxSpan = document.createElement("span");
-    wxSpan.className = "label-info";
+    wxSpan.className = "label-info metar-field metar-weather";
 
     // SCR123 FEW456
     const skySpan = document.createElement("span");
-    skySpan.className = "label-info";
+    skySpan.className = "label-info metar-field metar-sky";
 
     // 12°C
     const tempSpan = document.createElement("span");
-    tempSpan.className = "label-info";
+    tempSpan.className = "label-info metar-field metar-temperature";
 
     // A2992
     const altSpan = document.createElement("span");
-    altSpan.className = "label-info";
+    altSpan.className = "label-info metar-field metar-altimeter";
 
     // RMK blah
     const remarksSpan = document.createElement("span");
-    remarksSpan.className = "label-info";
+    remarksSpan.className = "label-info metar-field metar-remarks";
 
     tile.appendChild(station);
     tile.appendChild(timestampSpan);
