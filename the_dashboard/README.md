@@ -94,7 +94,7 @@ Failures use:
 }
 ```
 
-Current platform-owned routes include:
+Current Gateway routes include:
 
 - `GET /api/config`
 - `PUT /api/config`
@@ -107,34 +107,19 @@ Current platform-owned routes include:
 - `POST /api/todos/sync`
 - `POST /api/todos/tasks/update`
 
-Mounted widget-domain routes such as METAR use the same envelope.
+Widget-domain companion routes such as METAR and todos use the same envelope as
+platform-owned routes.
 
-## Adding A Widget Later
+## Adding a Widget
 
-The platform extension model is:
+See [adding-a-widget.md](adding-a-widget.md) for the expected extension points,
+frontend lifecycle, shared UI and Gateway conventions, test checklist, and the
+existing widgets that intentionally or historically differ from the preferred
+pattern.
 
-1. Add a frontend widget module at `dashboard/widgets/<type>.js`.
-2. Register it with `window.DASH.registerWidget("<type>", impl)`.
-3. Add any backend companion route module under `gateway/widget-routes/`.
-4. Mount that route in `gateway/gateway.js`.
-5. Enable the widget in `dashboard/config.js`.
-6. Run validation and smoke checks.
-
-Dashboard config is validated before widgets load. Widget declarations require a
-unique `id`, a valid `type`, optional `width`, optional `refreshMs`, optional
-object `props`.
-
-`PUT /api/config` validates submitted source before replacing `config.js`.
-Malformed or invalid source is rejected without changing the saved config.
-
-Widget modules receive `mount(root, { id, type, props })` and may expose
-an async `update(state)` method. Shared widget helpers live in
-`dashboard/platform/global.js`; prefer those for API URLs, JSON fetches, common
-tile layout, icons, state messages, and formatting before adding local helper
-code.
-
-If a widget import, mount, or update fails, the shell renders that failure in the
-affected tile instead of breaking the entire dashboard.
+Dashboard config is validated before widgets load. `PUT /api/config` also
+validates submitted source before replacing `config.js`; malformed or invalid
+source is rejected without changing the saved config.
 
 ## Validation
 
