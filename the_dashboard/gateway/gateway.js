@@ -3,8 +3,8 @@ import { CONFIG } from "./platform/config.js";
 
 import config from "./platform/routes/config.js";
 import netstats from "./platform/routes/netstats.js";
-import status from "./platform/routes/status.js";
 import metar from "./widget-routes/metar.js";
+import status from "./widget-routes/status.js";
 import todos from "./widget-routes/todos.js";
 
 const app = express();

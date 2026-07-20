@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { CONFIG, hostIsAllowed } from "../config.js";
-import { errorPayload, sendError, sendOk } from "../responses.js";
+import { CONFIG, hostIsAllowed } from "../platform/config.js";
+import { errorPayload, sendError, sendOk } from "../platform/responses.js";
 
 const router = Router();
 
