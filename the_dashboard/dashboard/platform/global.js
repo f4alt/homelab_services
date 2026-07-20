@@ -16,6 +16,13 @@ export async function fetchJson(pathOrUrl, options = {}) {
   } = options;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const callerSignal = fetchOptions.signal;
+  const abortFromCaller = () => controller.abort(callerSignal.reason);
+  if (callerSignal?.aborted) {
+    abortFromCaller();
+  } else {
+    callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+  }
   const rawUrl = String(pathOrUrl);
   const base = apiBase();
   const isAbsolute = /^https?:\/\//i.test(rawUrl);
@@ -31,7 +38,7 @@ export async function fetchJson(pathOrUrl, options = {}) {
         ...(fetchOptions.body ? { "Content-Type": "application/json" } : {}),
         ...(fetchOptions.headers || {})
       },
-      signal: fetchOptions.signal || controller.signal
+      signal: controller.signal
     });
     const json = await response.json().catch(() => null);
 
@@ -48,6 +55,7 @@ export async function fetchJson(pathOrUrl, options = {}) {
     return json;
   } finally {
     clearTimeout(timer);
+    callerSignal?.removeEventListener("abort", abortFromCaller);
   }
 }
 
