@@ -173,16 +173,16 @@ html,body {
 .ui-tile {
   background: var(--tile);
   border: 1px solid var(--tile-border);
-  border-radius: var(--radius);
-  box-shadow: 0 4px 24px rgba(var(--tile-shadow), .2);
+  border-radius: var(--tile-radius, var(--radius));
+  box-shadow: var(--tile-box-shadow, 0 4px 24px rgba(var(--tile-shadow), .2));
   min-width: 0;
-  padding: var(--widget-padding);
+  padding: var(--tile-padding, var(--widget-padding));
 }
 
 .ui-tile--compact {
-  border-radius: 6px;
-  box-shadow: none;
-  padding: 4px 8px;
+  --tile-box-shadow: none;
+  --tile-padding: 4px 8px;
+  --tile-radius: 6px;
 }
 
 .ui-row {
