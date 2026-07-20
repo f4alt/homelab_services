@@ -13,20 +13,20 @@ import {
     s.id = "countdown-widget-styles";
     s.textContent = `
     .countdown-tile {
+      --tile-box-shadow: 0 8px 24px rgba(var(--tile-shadow),.5);
+      --tile-padding: 16px 14px 20px;
       position: relative;
-      box-shadow: 0 8px 24px rgba(var(--tile-shadow),.5);
-      padding: 16px 14px 20px;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
     }
 
     .countdown-tile.cd-now {
-      box-shadow:
+      --tile-box-shadow:
         0 0 20px rgba(var(--ok-rgb), 0.5);
     }
     .countdown-tile.cd-overdue {
-      box-shadow:
+      --tile-box-shadow:
         0 0 20px rgba(var(--err-rgb), 0.5);
     }
 
