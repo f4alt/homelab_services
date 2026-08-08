@@ -55,6 +55,10 @@ export class FakeElement {
   }
 
   appendChild(child) {
+    if (child.parentElement) {
+      const previousIndex = child.parentElement.children.indexOf(child);
+      if (previousIndex >= 0) child.parentElement.children.splice(previousIndex, 1);
+    }
     child.parentElement = this;
     this.children.push(child);
     return child;

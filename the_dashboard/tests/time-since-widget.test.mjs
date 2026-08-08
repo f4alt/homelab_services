@@ -16,6 +16,20 @@ function successResponse(data) {
   };
 }
 
+function errorResponse(message) {
+  return {
+    ok: false,
+    status: 502,
+    async json() {
+      return {
+        ok: false,
+        data: null,
+        error: { message }
+      };
+    }
+  };
+}
+
 function deferred() {
   let resolve;
   const promise = new Promise((resolvePromise) => {
@@ -269,17 +283,7 @@ test("Done now restores the prior item and shows the shared error state on failu
 
   await withTimeSinceWidget(async (_url, options = {}) => {
     if (options.method === "POST") {
-      return {
-        ok: false,
-        status: 502,
-        async json() {
-          return {
-            ok: false,
-            data: null,
-            error: { message: "Unable to update todo." }
-          };
-        }
-      };
+      return errorResponse("Unable to update todo.");
     }
 
     getCount += 1;
@@ -300,9 +304,131 @@ test("Done now restores the prior item and shows the shared error state on failu
 
     assert.equal(getCount, 1);
     assert.equal(state.items[0].last_done, originalTimestamp);
-    assert.equal(state.pendingUids.size, 0);
+    assert.equal(state.pendingCompletions.size, 0);
     assert.equal(state.list.classList.contains("is-error"), true);
     assert.equal(state.list.children[0].textContent, "Unable to update todo.");
+  });
+});
+
+test("overlapping Done now actions keep optimistic and authoritative state isolated by UID", async () => {
+  const firstPost = deferred();
+  const secondPost = deferred();
+  const originalTimestamp = new Date(Date.now() - (5 * DAY_MS)).toISOString();
+  const authoritativeTimestamp = new Date(Date.now() - DAY_MS).toISOString();
+  let getCount = 0;
+
+  await withTimeSinceWidget(async (_url, options = {}) => {
+    if (options.method === "POST") {
+      const { uid } = JSON.parse(options.body);
+      return uid === "first" ? firstPost.promise : secondPost.promise;
+    }
+
+    getCount += 1;
+    return successResponse({
+      items: [
+        {
+          uid: "first",
+          name: "First activity",
+          source_file: "home.org",
+          last_done: getCount === 1 ? originalTimestamp : authoritativeTimestamp,
+          target_days: null
+        },
+        {
+          uid: "second",
+          name: "Second activity",
+          source_file: "home.org",
+          last_done: originalTimestamp,
+          target_days: null
+        }
+      ]
+    });
+  }, async ({ registration }) => {
+    const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
+    await registration.implementation.update(state);
+
+    const firstAction = findByClass(
+      state.list.children[0],
+      "time-since-done-button"
+    ).fireAsync("click");
+    const secondAction = findByClass(
+      state.list.children[1],
+      "time-since-done-button"
+    ).fireAsync("click");
+
+    firstPost.resolve(successResponse({ task: { uid: "first", status: "TODO" } }));
+    await firstAction;
+
+    assert.equal(
+      findByClass(state.list.children[1], "time-since-age-token").textContent,
+      "0"
+    );
+
+    secondPost.resolve(errorResponse("Second update failed."));
+    await secondAction;
+
+    assert.equal(state.items[0].last_done, authoritativeTimestamp);
+    assert.equal(state.items[1].last_done, originalTimestamp);
+    assert.equal(state.pendingCompletions.size, 0);
+  });
+});
+
+test("unchanged refreshes reuse source choices, rows, and row handlers", async () => {
+  const item = {
+    uid: "filter",
+    name: "Change the AC filter",
+    source_file: "home.org",
+    last_done: NOW_ISO,
+    target_days: 30
+  };
+
+  await withTimeSinceWidget(
+    async () => successResponse({ items: [item] }),
+    async ({ registration }) => {
+      const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
+      await registration.implementation.update(state);
+      const allChoice = state.menu.children[0];
+      const sourceChoice = state.menu.children[1];
+      const row = state.list.children[0];
+      const doneButton = findByClass(row, "time-since-done-button");
+
+      await registration.implementation.update(state);
+
+      assert.equal(state.menu.children[0], allChoice);
+      assert.equal(state.menu.children[1], sourceChoice);
+      assert.equal(state.list.children[0], row);
+      assert.equal(findByClass(state.list.children[0], "time-since-done-button"), doneButton);
+      assert.equal(doneButton.events.get("click").size, 1);
+    }
+  );
+});
+
+test("overlapping refresh requests are serialized and coalesced per instance", async () => {
+  const firstResponse = deferred();
+  let requestCount = 0;
+
+  await withTimeSinceWidget(async () => {
+    requestCount += 1;
+    if (requestCount === 1) return firstResponse.promise;
+    return successResponse({
+      items: [{
+        uid: "latest",
+        name: "Latest activity",
+        source_file: "home.org",
+        last_done: NOW_ISO,
+        target_days: null
+      }]
+    });
+  }, async ({ registration }) => {
+    const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
+    const firstUpdate = registration.implementation.update(state);
+    const secondUpdate = registration.implementation.update(state);
+
+    assert.equal(requestCount, 1);
+    firstResponse.resolve(successResponse({ items: [] }));
+    await Promise.all([firstUpdate, secondUpdate]);
+
+    assert.equal(requestCount, 2);
+    assert.equal(state.items[0].uid, "latest");
   });
 });
 
@@ -375,7 +501,7 @@ test("two time-since instances keep their source filters independent", async () 
       assert.equal(firstState.list.children.length, 1);
       assert.equal(secondState.currentSource.textContent, "All");
       assert.equal(secondState.list.children.length, 2);
-      assert.notEqual(firstState.pendingUids, secondState.pendingUids);
+      assert.notEqual(firstState.pendingCompletions, secondState.pendingCompletions);
     }
   );
 });

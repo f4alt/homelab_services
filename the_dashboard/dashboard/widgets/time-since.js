@@ -25,10 +25,8 @@ function ensureStyles() {
 
     .time-since-row {
       display: grid;
-      gap: 10px;
+      gap: var(--gap);
       grid-template-columns: minmax(0, 1fr) auto auto;
-      line-height: 1.2;
-      padding: 6px 4px;
     }
 
     .time-since-age {
@@ -49,15 +47,10 @@ function ensureStyles() {
     }
 
     .time-since-done-button {
-      background: transparent;
-      border: 1px solid var(--card-border);
-      border-radius: 6px;
+      appearance: none;
       color: var(--fg);
       cursor: pointer;
       font: inherit;
-      font-size: 11px;
-      line-height: 1.2;
-      padding: 3px 6px;
       white-space: nowrap;
     }
 
@@ -67,8 +60,8 @@ function ensureStyles() {
     }
 
     .time-since-done-button:disabled {
+      color: var(--muted);
       cursor: wait;
-      opacity: .55;
     }
   `;
   document.head.appendChild(styles);
@@ -78,52 +71,86 @@ function availableSources(items) {
   return [...new Set(items.map((item) => item.source_file))];
 }
 
-function renderMenu(state) {
-  state.menu.replaceChildren();
+function arraysEqual(left, right) {
+  return left.length === right.length &&
+    Array.from(left).every((value, index) => value === right[index]);
+}
 
-  for (const sourceFile of [ALL_SOURCES, ...state.sources]) {
-    const menuItem = document.createElement("button");
-    menuItem.type = "button";
-    menuItem.className = "clickable popup-menu-item time-since-menu-item";
-    menuItem.textContent = sourceFile || ALL_SOURCES_LABEL;
-    menuItem.title = sourceFile || ALL_SOURCES_LABEL;
-    menuItem.setAttribute("role", "option");
+function renderMenu(state) {
+  const menuSources = [ALL_SOURCES, ...state.sources];
+  if (!arraysEqual(menuSources, state.menuSources)) {
+    state.menuSources = menuSources;
+    state.menuItems = new Map();
+    state.menu.replaceChildren();
+
+    for (const sourceFile of menuSources) {
+      const menuItem = document.createElement("button");
+      menuItem.type = "button";
+      menuItem.className = "clickable popup-menu-item time-since-menu-item";
+      menuItem.textContent = sourceFile || ALL_SOURCES_LABEL;
+      menuItem.title = sourceFile || ALL_SOURCES_LABEL;
+      menuItem.setAttribute("role", "option");
+      menuItem.addEventListener("click", () => {
+        state.selectedSource = sourceFile;
+        state.menuController.close();
+        render(state);
+        state.sourceButton.focus();
+      });
+      state.menuItems.set(sourceFile, menuItem);
+      state.menu.appendChild(menuItem);
+    }
+  }
+
+  for (const [sourceFile, menuItem] of state.menuItems) {
     menuItem.setAttribute("aria-selected", String(sourceFile === state.selectedSource));
-    menuItem.addEventListener("click", () => {
-      state.selectedSource = sourceFile;
-      state.menuController.close();
-      render(state);
-      state.sourceButton.focus();
-    });
-    state.menu.appendChild(menuItem);
   }
 }
 
 function createRow(state, item) {
-  const presentation = getTimeSincePresentation(item, Date.now(), state.approachingRatio);
   const row = createElement("div", "ui-row time-since-row");
-  row.title = presentation.tooltip;
-
   const name = createElement("span", "label truncate time-since-name", item.name);
   const age = createElement("span", "label-info time-since-age");
-  const ageToken = createElement(
-    "span",
-    `time-since-age-token time-since-age-token--${presentation.classification}`,
-    presentation.ageToken
-  );
-  const ageSuffix = presentation.agePhrase.slice(presentation.ageToken.length);
-  age.append(ageToken, createElement("span", "time-since-age-unit", ageSuffix));
+  const ageToken = createElement("span", "time-since-age-token");
+  const ageUnit = createElement("span", "time-since-age-unit");
+  age.append(ageToken, ageUnit);
 
   const doneButton = document.createElement("button");
   doneButton.type = "button";
-  doneButton.className = "time-since-done-button";
+  doneButton.className = "ui-tile ui-tile--compact time-since-done-button";
   doneButton.textContent = "Done now";
-  doneButton.disabled = state.pendingUids.has(item.uid);
-  doneButton.setAttribute("aria-label", `Mark ${item.name} done now`);
-  doneButton.addEventListener("click", () => completeNow(state, item, doneButton));
 
   row.append(name, age, doneButton);
-  return row;
+  const rowView = { row, name, ageToken, ageUnit, doneButton, item };
+  doneButton.addEventListener("click", () => completeNow(state, rowView.item, doneButton));
+  updateRow(state, rowView, item);
+  return rowView;
+}
+
+function updateRow(state, rowView, item) {
+  const pendingCompletion = state.pendingCompletions.get(item.uid);
+  const presentedItem = pendingCompletion
+    ? { ...item, last_done: pendingCompletion.optimisticLastDone }
+    : item;
+  const presentation = getTimeSincePresentation(
+    presentedItem,
+    Date.now(),
+    state.approachingRatio
+  );
+
+  rowView.item = item;
+  rowView.row.title = presentation.tooltip;
+  rowView.name.textContent = item.name;
+  rowView.ageToken.className =
+    `time-since-age-token time-since-age-token--${presentation.classification}`;
+  rowView.ageToken.textContent = presentation.ageToken;
+  rowView.ageUnit.textContent = presentation.agePhrase.slice(presentation.ageToken.length);
+  rowView.doneButton.disabled = Boolean(pendingCompletion);
+  rowView.doneButton.setAttribute("aria-label", `Mark ${item.name} done now`);
+}
+
+function replaceChildrenWhenChanged(container, children) {
+  if (arraysEqual(container.children, children)) return;
+  container.replaceChildren(...children);
 }
 
 function render(state) {
@@ -137,42 +164,64 @@ function render(state) {
   renderMenu(state);
 
   state.list.classList.remove("is-loading", "is-empty", "is-error");
-  state.list.replaceChildren();
 
   const visibleItems = state.selectedSource
     ? state.items.filter((item) => item.source_file === state.selectedSource)
     : state.items;
+
+  const currentUids = new Set(state.items.map((item) => item.uid));
+  for (const uid of state.rowViews.keys()) {
+    if (!currentUids.has(uid)) state.rowViews.delete(uid);
+  }
+
   if (visibleItems.length === 0) {
     setStateMessage(state.list, "No tracked activities found.", "empty");
     return;
   }
 
+  const visibleRows = [];
   for (const item of visibleItems) {
-    state.list.appendChild(createRow(state, item));
+    let rowView = state.rowViews.get(item.uid);
+    if (!rowView) {
+      rowView = createRow(state, item);
+      state.rowViews.set(item.uid, rowView);
+    } else {
+      updateRow(state, rowView, item);
+    }
+    visibleRows.push(rowView.row);
+  }
+  replaceChildrenWhenChanged(state.list, visibleRows);
+}
+
+async function runLoadQueue(state) {
+  while (state.reloadRequested) {
+    state.reloadRequested = false;
+    const data = await fetchJson("/todos/time-since");
+    state.items = normalizeTimeSinceItems(data?.items);
+    render(state);
   }
 }
 
 async function loadItems(state) {
-  const requestVersion = ++state.requestVersion;
-  try {
-    const data = await fetchJson("/todos/time-since");
-    if (requestVersion !== state.requestVersion) return;
-
-    state.items = normalizeTimeSinceItems(data?.items);
-    render(state);
-  } catch (error) {
-    if (requestVersion === state.requestVersion) throw error;
+  state.reloadRequested = true;
+  if (!state.loadPromise) {
+    state.loadPromise = runLoadQueue(state).finally(() => {
+      state.loadPromise = null;
+    });
   }
+  return state.loadPromise;
 }
 
 async function completeNow(state, item, button) {
-  const previousItems = state.items;
+  if (state.pendingCompletions.has(item.uid)) return;
+
+  const previousIndex = state.items.findIndex((currentItem) => currentItem.uid === item.uid);
   button.disabled = true;
-  state.pendingUids.add(item.uid);
-  state.items = state.items.map((currentItem) => currentItem.uid === item.uid
-    ? { ...currentItem, last_done: new Date().toISOString() }
-    : currentItem
-  );
+  state.pendingCompletions.set(item.uid, {
+    optimisticLastDone: new Date().toISOString(),
+    previousIndex,
+    previousItem: item
+  });
   render(state);
 
   try {
@@ -183,11 +232,23 @@ async function completeNow(state, item, button) {
       }
     });
     await loadItems(state);
-    state.pendingUids.delete(item.uid);
+    state.pendingCompletions.delete(item.uid);
     render(state);
   } catch (error) {
-    state.pendingUids.delete(item.uid);
-    state.items = previousItems;
+    const pendingCompletion = state.pendingCompletions.get(item.uid);
+    state.pendingCompletions.delete(item.uid);
+    const currentIndex = state.items.findIndex((currentItem) => currentItem.uid === item.uid);
+    if (currentIndex >= 0) {
+      state.items = state.items.map((currentItem) => currentItem.uid === item.uid
+        ? pendingCompletion.previousItem
+        : currentItem
+      );
+    } else {
+      const insertionIndex = Math.min(pendingCompletion.previousIndex, state.items.length);
+      const restoredItems = [...state.items];
+      restoredItems.splice(insertionIndex, 0, pendingCompletion.previousItem);
+      state.items = restoredItems;
+    }
     render(state);
     setStateMessage(
       state.list,
@@ -231,8 +292,12 @@ window.DASH.registerWidget("time-since", {
       items: [],
       sources: [],
       selectedSource: ALL_SOURCES,
-      requestVersion: 0,
-      pendingUids: new Set()
+      loadPromise: null,
+      reloadRequested: false,
+      menuSources: [],
+      menuItems: new Map(),
+      rowViews: new Map(),
+      pendingCompletions: new Map()
     };
 
     state.menuController = createDismissibleMenu({
