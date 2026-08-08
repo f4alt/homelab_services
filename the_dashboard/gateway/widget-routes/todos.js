@@ -5,6 +5,10 @@ import { sendError, sendOk } from "../platform/responses.js";
 const router = Router();
 const VALID_STATUSES = new Set(["TODO", "DONE"]);
 
+export function normalizeTimeSincePayload(payload) {
+  return { items: Array.isArray(payload?.items) ? payload.items : [] };
+}
+
 async function fetchTodo(path, options = {}) {
   const response = await fetch(new URL(path, CONFIG.todoBaseUrl), {
     ...options,
@@ -53,6 +57,17 @@ router.get("/todos/tasks", async (_req, res) => {
     return sendUpstreamError(res, err, "Unable to load todos.");
   }
 });
+
+export async function getTimeSince(_req, res) {
+  try {
+    const payload = await fetchTodo("/time-since");
+    return sendOk(res, normalizeTimeSincePayload(payload));
+  } catch (err) {
+    return sendUpstreamError(res, err, "Unable to load time-since activities.");
+  }
+}
+
+router.get("/todos/time-since", getTimeSince);
 
 router.post("/todos/sync", async (_req, res) => {
   try {

@@ -62,6 +62,11 @@ behavior, not container health.
 Runtime config files are served with `Cache-Control: no-store` so office tuning
 does not get stuck behind browser cache.
 
+The `time-since` widget uses the non-secret `props.approachingRatio` display
+setting to choose when a tracked activity changes from its normal age color to
+the warning color. Values must be greater than `0` and no more than `1`; the
+widget defaults invalid values to `0.8`.
+
 ### Browser Config Editor
 
 For quick config edits, open `/config`. Nginx directly serves the lightweight
@@ -104,6 +109,7 @@ Current Gateway routes include:
 - `POST /api/statuschecks`
 - `GET /api/todos/health`
 - `GET /api/todos/tasks`
+- `GET /api/todos/time-since`
 - `POST /api/todos/sync`
 - `POST /api/todos/tasks/update`
 
@@ -113,6 +119,11 @@ representation.
 
 Widget-domain companions—including status, netstats, METAR, and todos—live in
 `gateway/widget-routes/` and use the same envelope as platform-owned routes.
+
+The dedicated `time-since` widget shows tracked Todo activities in backend
+order, provides local source-file filtering, colors only the elapsed-day value
+as a target approaches or passes, and records a completion through the existing
+Todo update route with its small `Done now` action.
 
 ## Adding a Widget
 

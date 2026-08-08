@@ -123,6 +123,15 @@ window.DASH_CONFIG = {
       }
     },
     {
+      type: "time-since",
+      id: "time_since",
+      width: "all",
+      refreshMs: 60000,
+      props: {
+        approachingRatio: 0.8
+      }
+    },
+    {
       type: "text",
       id: "HA_stub",
       width: "all",
