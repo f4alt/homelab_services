@@ -310,6 +310,39 @@ test("Done now restores the prior item and shows the shared error state on failu
   });
 });
 
+test("Done now retains the optimistic completion when only the authoritative reload fails", async () => {
+  const originalTimestamp = new Date(Date.now() - (5 * DAY_MS)).toISOString();
+  let getCount = 0;
+
+  await withTimeSinceWidget(async (_url, options = {}) => {
+    if (options.method === "POST") {
+      return successResponse({ task: { uid: "filter", status: "TODO" } });
+    }
+
+    getCount += 1;
+    if (getCount > 1) return errorResponse("Authoritative reload failed.");
+    return successResponse({
+      items: [{
+        uid: "filter",
+        name: "Change the AC filter",
+        source_file: "home.org",
+        last_done: originalTimestamp,
+        target_days: 30
+      }]
+    });
+  }, async ({ registration }) => {
+    const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
+    await registration.implementation.update(state);
+
+    await findByClass(state.list.children[0], "time-since-done-button").fireAsync("click");
+
+    assert.notEqual(state.items[0].last_done, originalTimestamp);
+    assert.equal(state.pendingCompletions.size, 0);
+    assert.equal(state.list.classList.contains("is-error"), true);
+    assert.equal(state.list.children[0].textContent, "Authoritative reload failed.");
+  });
+});
+
 test("overlapping Done now actions keep optimistic and authoritative state isolated by UID", async () => {
   const firstPost = deferred();
   const secondPost = deferred();

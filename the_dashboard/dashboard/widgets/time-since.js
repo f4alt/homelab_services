@@ -212,6 +212,31 @@ async function loadItems(state) {
   return state.loadPromise;
 }
 
+function replaceOrInsertItem(state, uid, replacement, preferredIndex) {
+  const currentIndex = state.items.findIndex((currentItem) => currentItem.uid === uid);
+  if (currentIndex >= 0) {
+    state.items = state.items.map((currentItem) => currentItem.uid === uid
+      ? replacement
+      : currentItem
+    );
+    return;
+  }
+
+  const insertionIndex = Math.min(Math.max(preferredIndex, 0), state.items.length);
+  const restoredItems = [...state.items];
+  restoredItems.splice(insertionIndex, 0, replacement);
+  state.items = restoredItems;
+}
+
+function showCompletionError(state, error, fallbackMessage) {
+  render(state);
+  setStateMessage(
+    state.list,
+    String(error?.message || fallbackMessage),
+    "error"
+  );
+}
+
 async function completeNow(state, item, button) {
   if (state.pendingCompletions.has(item.uid)) return;
 
@@ -231,29 +256,38 @@ async function completeNow(state, item, button) {
         body: JSON.stringify({ uid: item.uid, status: "DONE" })
       }
     });
+  } catch (error) {
+    const pendingCompletion = state.pendingCompletions.get(item.uid);
+    state.pendingCompletions.delete(item.uid);
+    replaceOrInsertItem(
+      state,
+      item.uid,
+      pendingCompletion.previousItem,
+      pendingCompletion.previousIndex
+    );
+    showCompletionError(state, error, "Unable to mark activity done.");
+    return;
+  }
+
+  try {
     await loadItems(state);
     state.pendingCompletions.delete(item.uid);
     render(state);
   } catch (error) {
     const pendingCompletion = state.pendingCompletions.get(item.uid);
     state.pendingCompletions.delete(item.uid);
-    const currentIndex = state.items.findIndex((currentItem) => currentItem.uid === item.uid);
-    if (currentIndex >= 0) {
-      state.items = state.items.map((currentItem) => currentItem.uid === item.uid
-        ? pendingCompletion.previousItem
-        : currentItem
-      );
-    } else {
-      const insertionIndex = Math.min(pendingCompletion.previousIndex, state.items.length);
-      const restoredItems = [...state.items];
-      restoredItems.splice(insertionIndex, 0, pendingCompletion.previousItem);
-      state.items = restoredItems;
-    }
-    render(state);
-    setStateMessage(
-      state.list,
-      String(error?.message || "Unable to mark activity done."),
-      "error"
+    const currentItem = state.items.find((candidate) => candidate.uid === item.uid) ||
+      pendingCompletion.previousItem;
+    replaceOrInsertItem(
+      state,
+      item.uid,
+      { ...currentItem, last_done: pendingCompletion.optimisticLastDone },
+      pendingCompletion.previousIndex
+    );
+    showCompletionError(
+      state,
+      error,
+      "Completion recorded, but the latest timestamp could not be loaded."
     );
   }
 }

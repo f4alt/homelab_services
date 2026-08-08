@@ -1,11 +1,17 @@
 const DAY_MS = 86_400_000;
 const DEFAULT_APPROACHING_RATIO = 0.8;
 const EXPLICIT_OFFSET_TIMESTAMP = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/i;
+const CLASSIFICATION = Object.freeze({
+  APPROACHING: "approaching",
+  NORMAL: "normal",
+  OVERDUE: "overdue",
+  UNKNOWN: "unknown"
+});
 const CLASSIFICATION_LABELS = Object.freeze({
-  approaching: "Approaching",
-  normal: "Normal",
-  overdue: "Overdue",
-  unknown: "Unknown"
+  [CLASSIFICATION.APPROACHING]: "Approaching",
+  [CLASSIFICATION.NORMAL]: "Normal",
+  [CLASSIFICATION.OVERDUE]: "Overdue",
+  [CLASSIFICATION.UNKNOWN]: "Unknown"
 });
 
 function parseLastDone(value) {
@@ -36,12 +42,12 @@ function normalizeRequiredText(value) {
 }
 
 function classifyAge(elapsedMs, targetDays, approachingRatio) {
-  if (targetDays === null) return "normal";
+  if (targetDays === null) return CLASSIFICATION.NORMAL;
 
   const targetMs = targetDays * DAY_MS;
-  if (elapsedMs >= targetMs) return "overdue";
-  if (elapsedMs / targetMs >= approachingRatio) return "approaching";
-  return "normal";
+  if (elapsedMs >= targetMs) return CLASSIFICATION.OVERDUE;
+  if (elapsedMs / targetMs >= approachingRatio) return CLASSIFICATION.APPROACHING;
+  return CLASSIFICATION.NORMAL;
 }
 
 function buildTooltip(lastDone, targetDays, classification) {
@@ -91,11 +97,11 @@ export function getTimeSincePresentation(item, nowMs, approachingRatio) {
       days: null,
       ageToken: "?",
       agePhrase: "? days since",
-      classification: "unknown",
+      classification: CLASSIFICATION.UNKNOWN,
       elapsedMs: null,
       lastDone: null,
       targetDays,
-      tooltip: buildTooltip(null, targetDays, "unknown")
+      tooltip: buildTooltip(null, targetDays, CLASSIFICATION.UNKNOWN)
     };
   }
 
