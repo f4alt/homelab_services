@@ -37,6 +37,53 @@ class VTodoTest(unittest.TestCase):
         self.assertEqual(parsed.percent_complete, 100)
         self.assertEqual(parsed.parent_uid, "parent")
 
+    def test_local_time_since_properties_are_not_serialized_to_vtodo(self):
+        task = Task(
+            level=1,
+            status="TODO",
+            content="Change filter",
+            source_file="home.org",
+            uid="fixed",
+            source_properties={
+                "CALDAV_UID": "fixed",
+                "TIME_SINCE": "2026-08-08T19:30:00Z",
+                "TIME_SINCE_TARGET_DAYS": "30",
+            },
+        )
+
+        serialized = task_to_ical(task)
+
+        self.assertNotIn("TIME_SINCE", serialized)
+
+    def test_invalid_completed_values_are_treated_as_missing(self):
+        invalid_properties = [
+            "COMPLETED:20260808T193000",
+            "COMPLETED;VALUE=DATE:20260808",
+            "COMPLETED:not-a-timestamp",
+        ]
+        calendar_template = (
+            "BEGIN:VCALENDAR\n"
+            "VERSION:2.0\n"
+            "BEGIN:VTODO\n"
+            "UID:fixed\n"
+            "SUMMARY:Change filter\n"
+            "STATUS:COMPLETED\n"
+            "{completed_property}\n"
+            "END:VTODO\n"
+            "END:VCALENDAR\n"
+        )
+
+        for completed_property in invalid_properties:
+            with self.subTest(completed_property=completed_property):
+                task = task_from_ical(
+                    calendar_template.format(completed_property=completed_property),
+                    source_file="home.org",
+                    collection="home",
+                )
+
+                self.assertEqual(task.status, "DONE")
+                self.assertIsNone(task.completed_at)
+
 
 if __name__ == "__main__":
     unittest.main()

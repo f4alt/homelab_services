@@ -2,7 +2,7 @@
 
 Bridge for syncing local orgmode todo files to devices through CalDAV VTODO.
 
-The app watches local `.org` files, maps each file to one [Radicale](https://radicale.org/) backed CalDAV task collection, and exposes a small JSON API for programatic updates. Radicale handles the CalDAV protocol; this repo handles org parsing, task identity, sync state, and API reads/updates.
+The app watches local `.org` files, maps each file to one [Radicale](https://radicale.org/) backed CalDAV task collection, and exposes a small JSON API for programmatic updates. Radicale handles the CalDAV protocol; this repo handles org parsing, task identity, sync state, and API reads/updates.
 
 ## How It Fits Together
 
@@ -10,7 +10,7 @@ The app watches local `.org` files, maps each file to one [Radicale](https://rad
 - `todo_sync/vtodo.py`: converts between internal tasks and iCalendar `VTODO`.
 - `todo_sync/caldav_client.py`: talks to Radicale over CalDAV HTTP methods.
 - `todo_sync/sync.py`: compares local hashes, remote hashes, ETags, and tombstones to decide what to push or pull.
-- `todo_sync/api.py`: serves `/health`, `/tasks`, `/sync`, and `/tasks/update`.
+- `todo_sync/api.py`: serves `/health`, `/tasks`, `/time-since`, `/sync`, and `/tasks/update`.
 - `radicale/`: local Radicale config, users file, and a staging directory for externally managed TLS certificates.
 
 ## Running
@@ -126,12 +126,54 @@ Synced fields:
 - `[N%]` ↔ `PERCENT-COMPLETE`
 - nested TODO headings ↔ `RELATED-TO`
 
+### Time-since tracking
+
+Add an empty `TIME_SINCE` property to opt a heading into time-since tracking. An optional positive-integer target provides presentation guidance without creating a due date or schedule:
+
+```org
+* TODO Change the AC filter
+:PROPERTIES:
+:CALDAV_UID: 3a0f...
+:TIME_SINCE:
+:TIME_SINCE_TARGET_DAYS: 30
+:END:
+```
+
+After an explicit completion, the server records the latest completion at second precision in UTC and immediately reopens the same task:
+
+```org
+:TIME_SINCE: 2026-08-08T19:30:00Z
+```
+
+`TIME_SINCE` presence is the sole opt-in. Removing that property opts the heading out, even if `TIME_SINCE_TARGET_DAYS` remains. Empty or malformed timestamps remain tracked but project without a last-completed time. Missing, malformed, fractional, zero, or negative target values project without a target.
+
+For a tracked task, `DONE` is an input event rather than a lasting state. Explicit `DONE` from Org, `STATUS:COMPLETED` from CalDAV, and `POST /tasks/update` record the newest completion and settle the task back to `TODO` with the same UID. `PERCENT-COMPLETE:100` alone is not a completion event. The sync worker polls, so direct Org and CalDAV changes are eventually consistent within the configured polling interval.
+
 ## API
 
 - `GET /health`: health check.
 - `GET /tasks`: list local tasks from all org files.
+- `GET /time-since`: list the compact time-since projection.
 - `POST /sync`: run sync immediately.
 - `POST /tasks/update`: update local task status by CalDAV UID.
+
+Time-since response:
+
+```json
+{
+  "items": [
+    {
+      "uid": "3a0f...",
+      "name": "Change the AC filter",
+      "source_file": "homelab.org",
+      "last_done": "2026-08-08T19:30:00Z",
+      "target_days": 30
+    }
+  ]
+}
+```
+
+`last_done` and `target_days` are nullable. The endpoint returns source facts and does not calculate elapsed days or urgency.
 
 Update payload:
 
@@ -142,9 +184,11 @@ Update payload:
 }
 ```
 
+Sending `DONE` through this existing update route resets the time-since clock for a tracked task. The response contains the task already settled back to `TODO`.
+
 ## Sync Notes
 
-The sync state file stores local hashes, remote hashes, ETags, and deletion tombstones. This lets the bridge distinguish real remote changes from harmless ETag churn.
+The sync state file stores local hashes, remote hashes, ETags, deletion tombstones, and remote-completion retry mechanics. This lets the bridge distinguish real remote changes from harmless ETag churn and consume a timestamp-less completion only once. The file is rewritten only after a material state change, through an atomic sibling-file replacement; no-op polling cycles leave it untouched.
 
 Conflict policy:
 

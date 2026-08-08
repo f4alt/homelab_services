@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from icalendar import Calendar, Todo
 
-from .models import Task
+from .models import Task, parse_aware_datetime
+
+
+COMPLETED_PROPERTY_RE = re.compile(
+    r"^COMPLETED(?:;[^:\r\n]*)?:[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*(?:\r?\n|$)",
+    flags=re.IGNORECASE | re.MULTILINE,
+)
 
 
 def _first_value(component, key):
@@ -79,7 +86,14 @@ def task_to_ical(task: Task):
 
 
 def task_from_ical(ical_data, source_file=None, collection=None, meta=None):
-    calendar = Calendar.from_ical(ical_data)
+    try:
+        calendar = Calendar.from_ical(ical_data)
+    except ValueError:
+        text = ical_data.decode("utf-8") if isinstance(ical_data, bytes) else ical_data
+        sanitized, removed_count = COMPLETED_PROPERTY_RE.subn("", text)
+        if removed_count == 0:
+            raise
+        calendar = Calendar.from_ical(sanitized)
     todo = next((component for component in calendar.walk() if component.name == "VTODO"), None)
     if todo is None:
         return None
@@ -101,7 +115,7 @@ def task_from_ical(ical_data, source_file=None, collection=None, meta=None):
         priority=int(priority) if priority is not None else None,
         scheduled=_first_value(todo, "dtstart"),
         deadline=_first_value(todo, "due"),
-        completed_at=_first_value(todo, "completed"),
+        completed_at=parse_aware_datetime(_first_value(todo, "completed")),
         percent_complete=int(percent_complete) if percent_complete is not None else None,
         parent_uid=_text(todo, "related-to") or None,
         collection=coll,

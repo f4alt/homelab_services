@@ -30,6 +30,31 @@ class TodoFileTest(unittest.TestCase):
             self.assertIsNotNone(tasks["Pay bill"].uid)
             self.assertIn(":CALDAV_UID:", path.read_text(encoding="utf-8"))
 
+    def test_uid_creation_preserves_unknown_properties(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "home.org"
+            path.write_text(
+                "* TODO Pay bill\n"
+                ":PROPERTIES:\n"
+                ":OWNER: household\n"
+                "  :OWNER: secondary  \n"
+                ":owner-name: Chris\n"
+                ":TIME_SINCE:\n"
+                ":TIME_SINCE_TARGET_DAYS: thirty\n"
+                ":END:\n",
+                encoding="utf-8",
+            )
+
+            TodoFile(path).get_tasks()
+
+            text = path.read_text(encoding="utf-8")
+            self.assertIn(":OWNER: household\n", text)
+            self.assertIn("  :OWNER: secondary  \n", text)
+            self.assertEqual(text.count(":OWNER:"), 2)
+            self.assertIn(":owner-name: Chris\n", text)
+            self.assertIn(":TIME_SINCE:\n", text)
+            self.assertIn(":TIME_SINCE_TARGET_DAYS: thirty\n", text)
+
     def test_existing_uid_survives_content_edits(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "home.org"
@@ -71,6 +96,28 @@ class TodoFileTest(unittest.TestCase):
             self.assertEqual(task.deadline.isoformat(), "2026-06-09")
             self.assertEqual(task.description, "First note line\nSecond note line")
 
+    def test_parses_time_since_presence_values_and_targets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "home.org"
+            path.write_text(
+                "* TODO Absent\n:PROPERTIES:\n:TIME_SINCE_TARGET_DAYS: 10\n:END:\n"
+                "* TODO Empty\n:PROPERTIES:\n:TIME_SINCE:\n:TIME_SINCE_TARGET_DAYS: 30\n:END:\n"
+                "* TODO Valid\n:PROPERTIES:\n:TIME_SINCE: 2026-08-08T14:30:00-05:00\n:END:\n"
+                "* TODO Malformed\n:PROPERTIES:\n:TIME_SINCE: yesterday\n"
+                ":TIME_SINCE_TARGET_DAYS: 2.5\n:END:\n",
+                encoding="utf-8",
+            )
+
+            tasks = {task.content: task for task in TodoFile(path).get_tasks(ensure_uids=False)}
+
+            self.assertIsNone(tasks["Absent"].time_since)
+            self.assertIsNone(tasks["Empty"].time_since.last_done)
+            self.assertEqual(tasks["Empty"].time_since.target_days, 30)
+            self.assertEqual(tasks["Valid"].time_since.last_done.isoformat(), "2026-08-08T14:30:00-05:00")
+            self.assertIsNone(tasks["Valid"].time_since.target_days)
+            self.assertIsNone(tasks["Malformed"].time_since.last_done)
+            self.assertIsNone(tasks["Malformed"].time_since.target_days)
+
     def test_nested_heading_sets_parent_uid(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "home.org"
@@ -97,6 +144,27 @@ class TodoFileTest(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertIn("* DONE Pay bill\n", text)
             self.assertIn("Notes stay untouched\n", text)
+
+    def test_status_update_and_reopen_preserve_unknown_properties(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "home.org"
+            path.write_text(
+                "* TODO Pay bill\n"
+                ":PROPERTIES:\n"
+                ":CALDAV_UID: fixed\n"
+                ":OWNER: household\n"
+                ":TIME_SINCE:\n"
+                ":END:\n",
+                encoding="utf-8",
+            )
+            todo_file = TodoFile(path)
+
+            todo_file.update([Task(1, "DONE", "Pay bill", "home.org", uid="fixed")], allow_reopen=True)
+            todo_file.update([Task(1, "TODO", "Pay bill", "home.org", uid="fixed")], allow_reopen=True)
+
+            text = path.read_text(encoding="utf-8")
+            self.assertIn(":OWNER: household\n", text)
+            self.assertIn(":TIME_SINCE:\n", text)
 
     def test_reopen_by_uid_preserves_uid_and_clears_completed_property(self):
         with tempfile.TemporaryDirectory() as tmp:

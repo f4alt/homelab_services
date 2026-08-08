@@ -29,6 +29,10 @@ def create_app(settings=None):
         tasks = [task.to_dict() for task in service.get_local_tasks()]
         return jsonify({"tasks": tasks})
 
+    @app.get("/time-since")
+    def get_time_since():
+        return jsonify({"items": service.get_time_since_items()})
+
     @app.post("/tasks/update")
     def update_task():
         data = request.get_json(silent=True)

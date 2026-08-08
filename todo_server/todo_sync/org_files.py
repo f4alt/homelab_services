@@ -8,7 +8,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .models import Task
+from .models import (
+    DONE_STATUS,
+    PERCENT_COMPLETE_RE,
+    TODO_STATUS,
+    SourceProperties,
+    Task,
+    parse_aware_datetime,
+)
 
 
 TODO_HEADING_RE = re.compile(
@@ -17,9 +24,9 @@ TODO_HEADING_RE = re.compile(
     r"(?P<title>.*?)(?:\s+:(?P<tags>[A-Za-z0-9_@#%:.-]+):)?\s*$"
 )
 ANY_HEADING_RE = re.compile(r"^(?P<stars>\*+)\s+")
-PROPERTY_RE = re.compile(r"^\s*:(?P<key>[A-Z0-9_]+):\s*(?P<value>.*?)\s*$")
+PROPERTY_RE = re.compile(r"^\s*:(?P<key>[^:\s]+):\s*(?P<value>.*?)\s*$")
 PLANNING_RE = re.compile(r"(SCHEDULED|DEADLINE):\s*<([^>]+)>")
-PERCENT_RE = re.compile(r"\[(?P<percent>\d{1,3})%\]")
+REPLACE_META_KEY = "replace"
 
 
 ORG_PRIORITY_TO_VTODO = {"A": 1, "B": 5, "C": 9}
@@ -82,7 +89,7 @@ class TodoFile:
                 if block.task.uid is None:
                     block.task.uid = str(uuid.uuid4())
                     changed = True
-                if block.task.status == "TODO" and block.has_completed_property:
+                if block.task.status == TODO_STATUS and block.has_completed_property:
                     changed = True
             if changed:
                 lines = self._render_blocks_into_lines(lines, blocks)
@@ -115,7 +122,7 @@ class TodoFile:
         return blocks
 
     def _parse_block(self, lines, start, end, match, parent_uid):
-        properties = {}
+        properties = SourceProperties()
         cursor = start + 1
         if cursor < end and lines[cursor].strip() == ":PROPERTIES:":
             cursor += 1
@@ -125,7 +132,11 @@ class TodoFile:
                     break
                 prop_match = PROPERTY_RE.match(lines[cursor].rstrip("\n"))
                 if prop_match:
-                    properties[prop_match.group("key")] = prop_match.group("value")
+                    properties.append(
+                        prop_match.group("key"),
+                        prop_match.group("value"),
+                        raw_line=lines[cursor],
+                    )
                 cursor += 1
 
         scheduled = None
@@ -157,15 +168,15 @@ class TodoFile:
         priority_letter = match.group(4)
         content = match.group("title").strip()
         tags = [tag for tag in (match.group("tags") or "").split(":") if tag]
-        percent_match = PERCENT_RE.search(content)
+        percent_match = PERCENT_COMPLETE_RE.search(content)
         percent_complete = None
         if percent_match:
             percent_complete = int(percent_match.group("percent"))
 
         completed_at = None
         completed_value = properties.get("CALDAV_COMPLETED")
-        if completed_value and match.group("status") == "DONE":
-            completed_at = datetime.fromisoformat(completed_value)
+        if completed_value and match.group("status") == DONE_STATUS:
+            completed_at = parse_aware_datetime(completed_value)
 
         task = Task(
             level=len(match.group("stars")),
@@ -182,6 +193,7 @@ class TodoFile:
             percent_complete=percent_complete,
             parent_uid=properties.get("CALDAV_PARENT_UID") or parent_uid,
             collection=self.collection,
+            source_properties=properties,
         )
         return TaskBlock(task, start, end, "CALDAV_COMPLETED" in properties)
 
@@ -203,14 +215,18 @@ class TodoFile:
         tags = f" :{':'.join(task.tags)}:" if task.tags else ""
         lines = [f"{stars} {task.status}{priority} {task.content}{tags}\n"]
 
-        properties = {"CALDAV_UID": task.uid or str(uuid.uuid4())}
+        properties = task.source_properties.copy()
+        properties["CALDAV_UID"] = task.uid or str(uuid.uuid4())
         if task.parent_uid:
             properties["CALDAV_PARENT_UID"] = task.parent_uid
+        else:
+            properties.pop("CALDAV_PARENT_UID", None)
         if task.completed_at:
             properties["CALDAV_COMPLETED"] = task.completed_at.isoformat()
+        else:
+            properties.pop("CALDAV_COMPLETED", None)
         lines.append(":PROPERTIES:\n")
-        for key, value in properties.items():
-            lines.append(f":{key}: {value}\n")
+        lines.extend(properties.render_lines())
         lines.append(":END:\n")
 
         planning = []
@@ -236,6 +252,12 @@ class TodoFile:
         return None
 
     def update(self, tasks, allow_reopen=False):
+        self._update(tasks, allow_reopen=allow_reopen, tasks_are_merged=False)
+
+    def write_merged(self, tasks):
+        self._update(tasks, allow_reopen=True, tasks_are_merged=True)
+
+    def _update(self, tasks, allow_reopen, tasks_are_merged):
         with self.lock:
             blocks = self._load_tasks_from_file(ensure_uids=True)
             lines = self._read_lines()
@@ -260,10 +282,25 @@ class TodoFile:
                     by_uid[appended.uid] = TaskBlock(appended, start, start + len(rendered))
                     continue
 
-                if task.status != current.task.status and not (task.status == "DONE" or allow_reopen):
+                if task.status != current.task.status and not (task.status == DONE_STATUS or allow_reopen):
                     continue
-                replacement = self._merge_task_update(current.task, task)
-                if replacement.normalized_dict() != current.task.normalized_dict():
+                if tasks_are_merged:
+                    replacement = task.copy_with(
+                        level=current.task.level,
+                        source_file=self.relative_path,
+                        collection=self.collection,
+                    )
+                else:
+                    replacement = merge_task_update(
+                        current.task,
+                        task,
+                        self.relative_path,
+                        self.collection,
+                    )
+                if (
+                    replacement.normalized_dict() != current.task.normalized_dict()
+                    or replacement.source_properties != current.task.source_properties
+                ):
                     changed = True
                     current.task = replacement
 
@@ -282,31 +319,6 @@ class TodoFile:
             del lines[block.start : block.end]
             self._write_lines(lines)
             return True
-
-    def _merge_task_update(self, current, incoming):
-        replace = incoming.meta.get("replace", False)
-        if replace:
-            return incoming.copy_with(source_file=self.relative_path, collection=self.collection)
-        completed_at = incoming.completed_at if incoming.completed_at is not None else current.completed_at
-        percent_complete = incoming.percent_complete if incoming.percent_complete is not None else current.percent_complete
-        if incoming.status == "TODO":
-            completed_at = None
-            percent_complete = None
-        return current.copy_with(
-            status=incoming.status,
-            content=incoming.content or current.content,
-            uid=incoming.uid or current.uid,
-            description=incoming.description or current.description,
-            tags=list(incoming.tags) or list(current.tags),
-            priority=incoming.priority if incoming.priority is not None else current.priority,
-            scheduled=incoming.scheduled if incoming.scheduled is not None else current.scheduled,
-            deadline=incoming.deadline if incoming.deadline is not None else current.deadline,
-            completed_at=completed_at,
-            percent_complete=percent_complete,
-            parent_uid=incoming.parent_uid or current.parent_uid,
-            source_file=self.relative_path,
-            collection=self.collection,
-        )
 
 
 class LocalFiles:
@@ -349,6 +361,12 @@ class LocalFiles:
         return None
 
     def update(self, tasks, allow_reopen=False):
+        self._update(tasks, allow_reopen=allow_reopen, tasks_are_merged=False)
+
+    def write_merged(self, tasks):
+        self._update(tasks, allow_reopen=True, tasks_are_merged=True)
+
+    def _update(self, tasks, allow_reopen, tasks_are_merged):
         todo_files = self._scan_todo_files()
         tasks_by_file = {}
         for task in tasks:
@@ -359,10 +377,46 @@ class LocalFiles:
             if todo_file is None:
                 fullpath = self.directory / relative_path
                 todo_file = TodoFile(fullpath, relative_path)
-            todo_file.update(grouped_tasks, allow_reopen=allow_reopen)
+            if tasks_are_merged:
+                todo_file.write_merged(grouped_tasks)
+            else:
+                todo_file.update(grouped_tasks, allow_reopen=allow_reopen)
 
     def delete(self, source_file, uid):
         todo_file = self._scan_todo_files().get(source_file)
         if todo_file is None:
             return False
         return todo_file.delete(uid)
+
+
+def merge_task_update(current, incoming, source_file, collection):
+    if incoming.meta.get(REPLACE_META_KEY, False):
+        return incoming.copy_with(
+            level=current.level,
+            source_file=source_file,
+            collection=collection,
+            source_properties=current.source_properties,
+        )
+
+    completed_at = incoming.completed_at if incoming.completed_at is not None else current.completed_at
+    percent_complete = incoming.percent_complete if incoming.percent_complete is not None else current.percent_complete
+    if incoming.status == TODO_STATUS:
+        completed_at = None
+        percent_complete = incoming.percent_complete
+    source_properties = incoming.source_properties or current.source_properties
+    return current.copy_with(
+        status=incoming.status,
+        content=incoming.content or current.content,
+        uid=incoming.uid or current.uid,
+        description=incoming.description or current.description,
+        tags=list(incoming.tags) or list(current.tags),
+        priority=incoming.priority if incoming.priority is not None else current.priority,
+        scheduled=incoming.scheduled if incoming.scheduled is not None else current.scheduled,
+        deadline=incoming.deadline if incoming.deadline is not None else current.deadline,
+        completed_at=completed_at,
+        percent_complete=percent_complete,
+        parent_uid=incoming.parent_uid or current.parent_uid,
+        source_file=source_file,
+        collection=collection,
+        source_properties=source_properties,
+    )
