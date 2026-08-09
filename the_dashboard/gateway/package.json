@@ -10,6 +10,6 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "node-ical": "^0.26.1"
+    "ical.js": "^2.2.1"
   }
 }

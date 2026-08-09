@@ -75,6 +75,9 @@ test("next federal holiday includes observed dates across calendar years", () =>
 });
 
 test("calendar occupancy honors all-day exclusivity and timed midnight boundaries", () => {
+  const at = (year, month, day, hour) => (
+    new Date(year, month, day, hour).toISOString()
+  );
   const events = [
     {
       id: "all-day",
@@ -88,16 +91,16 @@ test("calendar occupancy honors all-day exclusivity and timed midnight boundarie
       id: "overnight",
       title: "Overnight",
       allDay: false,
-      start: "2026-08-10T04:00:00.000Z",
-      end: "2026-08-10T07:00:00.000Z",
+      start: at(2026, 7, 9, 23),
+      end: at(2026, 7, 10, 2),
       feedOrder: 1
     },
     {
       id: "ends-midnight",
       title: "Ends at midnight",
       allDay: false,
-      start: "2026-08-11T22:00:00.000Z",
-      end: "2026-08-12T05:00:00.000Z",
+      start: at(2026, 7, 11, 17),
+      end: at(2026, 7, 12, 0),
       feedOrder: 2
     }
   ];

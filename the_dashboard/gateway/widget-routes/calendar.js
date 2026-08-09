@@ -248,6 +248,10 @@ function firstHeaderValue(value) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function discardResponseBody(response) {
+  response.body?.destroy?.();
+}
+
 export function createCalendarFeedClient({
   timeoutMs,
   maxRedirects,
@@ -268,6 +272,7 @@ export function createCalendarFeedClient({
 
         if (REDIRECT_STATUSES.has(response.status)) {
           if (redirectCount >= maxRedirects) {
+            discardResponseBody(response);
             throw new CalendarGatewayError(
               502,
               "calendar_redirect_limit",
@@ -276,19 +281,21 @@ export function createCalendarFeedClient({
           }
           const location = firstHeaderValue(response.headers?.location);
           if (!location) {
+            discardResponseBody(response);
             throw new CalendarGatewayError(
               502,
               "calendar_upstream_error",
               "Calendar feed returned an invalid redirect."
             );
           }
-          response.body.destroy?.();
+          discardResponseBody(response);
           url = validateFeedUrl(new URL(location, url).toString());
           redirectCount += 1;
           continue;
         }
 
         if (response.status < 200 || response.status >= 300) {
+          discardResponseBody(response);
           throw new CalendarGatewayError(
             502,
             "calendar_upstream_error",
@@ -298,7 +305,7 @@ export function createCalendarFeedClient({
 
         const contentLength = Number(firstHeaderValue(response.headers?.["content-length"]));
         if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-          response.body.destroy?.();
+          discardResponseBody(response);
           throw new CalendarGatewayError(
             502,
             "calendar_feed_too_large",
@@ -384,10 +391,17 @@ function validateRange(fromValue, toValue) {
 
   const rangeStart = new Date(fromSource);
   const rangeEnd = new Date(toSource);
+  if (
+    !Number.isFinite(rangeStart.getTime())
+    || !Number.isFinite(rangeEnd.getTime())
+    || rangeStart.toISOString() !== fromSource
+    || rangeEnd.toISOString() !== toSource
+  ) {
+    invalidRequest("invalid_calendar_range", "Calendar date range is invalid.");
+  }
   const rangeMilliseconds = rangeEnd - rangeStart;
   if (
-    !Number.isFinite(rangeMilliseconds)
-    || rangeMilliseconds <= 0
+    rangeMilliseconds <= 0
     || rangeMilliseconds > MAX_RANGE_DAYS * MILLISECONDS_PER_DAY
   ) {
     invalidRequest("invalid_calendar_range", "Calendar date range is invalid.");

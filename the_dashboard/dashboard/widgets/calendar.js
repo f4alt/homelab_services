@@ -8,6 +8,7 @@ import {
 import {
   addLocalDays,
   buildMonthGrid,
+  CALENDAR_GRID_DAYS,
   countdownState,
   eventsForDate,
   formatEventTimeRange,
@@ -20,7 +21,6 @@ import {
 } from "./calendar-domain.js";
 
 const CALENDAR_STYLE_ID = "calendar-widget-styles";
-const CALENDAR_GRID_DAYS = 42;
 const SEARCH_DAYS = 366;
 const MAX_FEED_URL_LENGTH = 2048;
 const WEEKDAY_LABELS = Object.freeze(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);

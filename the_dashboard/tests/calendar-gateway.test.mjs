@@ -21,6 +21,15 @@ function bodyFrom(...chunks) {
   return chunks.map((chunk) => Buffer.from(chunk));
 }
 
+function trackedBody(...chunks) {
+  const body = bodyFrom(...chunks);
+  body.destroyed = false;
+  body.destroy = () => {
+    body.destroyed = true;
+  };
+  return body;
+}
+
 test("calendar handler validates its complete public query contract before fetching", async () => {
   let fetchCalls = 0;
   const handler = createCalendarHandler({
@@ -39,6 +48,7 @@ test("calendar handler validates its complete public query contract before fetch
     { ...VALID_QUERY, feedUrl: "not a URL" },
     { ...VALID_QUERY, from: "yesterday" },
     { ...VALID_QUERY, from: "2026-99-99T00:00:00.000Z" },
+    { ...VALID_QUERY, from: "2026-02-31T00:00:00.000Z" },
     { ...VALID_QUERY, to: VALID_QUERY.from },
     { ...VALID_QUERY, to: "2028-08-10T05:00:00.000Z" },
     { ...VALID_QUERY, timeZone: "Not/A-Timezone" }
@@ -209,6 +219,68 @@ test("calendar feed timeout covers DNS resolution as well as response streaming"
     client.fetchCalendar(new URL("https://calendar.example.test/feed.ics")),
     { code: "calendar_upstream_timeout", status: 504 }
   );
+});
+
+test("calendar feed client disposes every response body it does not consume", async () => {
+  const publicResolution = async () => [{ address: "8.8.8.8", family: 4 }];
+
+  const errorBody = trackedBody("ignored error content");
+  const upstreamError = createCalendarFeedClient({
+    timeoutMs: 1000,
+    maxRedirects: 1,
+    maxBytes: 1024,
+    resolveHost: publicResolution,
+    signalForTimeout: () => new AbortController().signal,
+    requestOnce: async () => ({ status: 503, headers: {}, body: errorBody })
+  });
+  await assert.rejects(
+    upstreamError.fetchCalendar(new URL("https://calendar.example.test/feed.ics")),
+    { code: "calendar_upstream_error" }
+  );
+  assert.equal(errorBody.destroyed, true);
+
+  const missingLocationBody = trackedBody();
+  const missingLocation = createCalendarFeedClient({
+    timeoutMs: 1000,
+    maxRedirects: 1,
+    maxBytes: 1024,
+    resolveHost: publicResolution,
+    signalForTimeout: () => new AbortController().signal,
+    requestOnce: async () => ({
+      status: 302,
+      headers: {},
+      body: missingLocationBody
+    })
+  });
+  await assert.rejects(
+    missingLocation.fetchCalendar(new URL("https://calendar.example.test/feed.ics")),
+    { code: "calendar_upstream_error" }
+  );
+  assert.equal(missingLocationBody.destroyed, true);
+
+  const redirectBodies = [];
+  const redirectLimit = createCalendarFeedClient({
+    timeoutMs: 1000,
+    maxRedirects: 1,
+    maxBytes: 1024,
+    resolveHost: publicResolution,
+    signalForTimeout: () => new AbortController().signal,
+    requestOnce: async () => {
+      const body = trackedBody();
+      redirectBodies.push(body);
+      return {
+        status: 302,
+        headers: { location: "https://calendar.example.test/again.ics" },
+        body
+      };
+    }
+  });
+  await assert.rejects(
+    redirectLimit.fetchCalendar(new URL("https://calendar.example.test/feed.ics")),
+    { code: "calendar_redirect_limit" }
+  );
+  assert.equal(redirectBodies.length, 2);
+  assert.equal(redirectBodies.every((body) => body.destroyed), true);
 });
 
 test("calendar handler translates parser and timeout failures to stable safe errors", async () => {
