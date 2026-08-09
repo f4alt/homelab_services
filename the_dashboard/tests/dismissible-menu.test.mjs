@@ -102,7 +102,11 @@ test("search exposes one dismissible listbox and preserves engine selection and 
     instance.input.value = "dashboard";
     const submitEvent = instance.input.fire("keydown", { key: "Enter" });
     assert.equal(submitEvent.defaultPrevented, true);
-    assert.equal(opened[0][0], "/second?q=dashboard");
+    assert.deepEqual(opened[0], [
+      "/second?q=dashboard",
+      "_blank",
+      "noopener,noreferrer"
+    ]);
     assert.equal(instance.input.value, "");
 
     instance.menuController.open();

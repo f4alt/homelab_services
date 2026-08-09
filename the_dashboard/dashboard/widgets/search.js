@@ -63,19 +63,8 @@ import { createDismissibleMenu, createStack } from "../platform/global.js";
     ];
   }
 
-  function openPopupForUrl(targetUrl, titleText) {
-    const w = window.open(
-      targetUrl,
-      "_blank",
-      "noopener,noreferrer,width=1200,height=800"
-    );
-    if (w && titleText) {
-      try {
-        w.document.title = titleText;
-      } catch {
-        /* cross-origin -> ignore */
-      }
-    }
+  function openUrlInNewTab(targetUrl) {
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
   }
 
   window.DASH.registerWidget("search", {
@@ -173,8 +162,7 @@ import { createDismissibleMenu, createStack } from "../platform/global.js";
         // We don't *force* the glow here anymore;
         // if user hits Enter, they're already focused so it's already on.
         const targetUrl = eng.buildUrl(q);
-        const titleText = `${eng.name} search for "${q}"`;
-        openPopupForUrl(targetUrl, titleText);
+        openUrlInNewTab(targetUrl);
         input.value = "";
       }
 
