@@ -125,7 +125,17 @@ class IntlTimeZone extends ICAL.Timezone {
   }
 }
 
-function registerReferencedIanaTimeZones(calendar, eventComponents) {
+function registerIanaTimeZone(timeZoneId) {
+  if (ICAL.TimezoneService.has(timeZoneId)) return;
+  try {
+    ICAL.TimezoneService.register(new IntlTimeZone(timeZoneId));
+  } catch {
+    throw new CalendarDataError("malformed_calendar", "Calendar data is malformed.");
+  }
+}
+
+function registerReferencedIanaTimeZones(calendar, eventComponents, browserTimeZone) {
+  registerIanaTimeZone(browserTimeZone);
   const timeZoneIds = new Set();
   for (const component of eventComponents) {
     for (const property of component.getAllProperties()) {
@@ -138,10 +148,33 @@ function registerReferencedIanaTimeZones(calendar, eventComponents) {
     if (calendar.getTimeZoneByID(timeZoneId) || ICAL.TimezoneService.has(timeZoneId)) {
       continue;
     }
-    try {
-      ICAL.TimezoneService.register(new IntlTimeZone(timeZoneId));
-    } catch {
-      throw new CalendarDataError("malformed_calendar", "Calendar data is malformed.");
+    registerIanaTimeZone(timeZoneId);
+  }
+}
+
+function bindFloatingTime(time, browserZone) {
+  if (
+    time instanceof ICAL.Time
+    && !time.isDate
+    && time.zone === ICAL.Timezone.localTimezone
+  ) {
+    time.zone = browserZone;
+  }
+}
+
+function bindFloatingEventTimes(eventComponents, browserZone) {
+  for (const component of eventComponents) {
+    for (const property of component.getAllProperties()) {
+      for (const value of property.getValues()) {
+        if (value instanceof ICAL.Period) {
+          bindFloatingTime(value.start, browserZone);
+          bindFloatingTime(value.end, browserZone);
+        } else if (value instanceof ICAL.Recur) {
+          bindFloatingTime(value.until, browserZone);
+        } else {
+          bindFloatingTime(value, browserZone);
+        }
+      }
     }
   }
 }
@@ -286,7 +319,13 @@ function assertRecurrenceScanIsBounded(event, searchEndMilliseconds, scanLimit) 
     const interval = Number.isInteger(rule.interval) && rule.interval > 0
       ? rule.interval
       : 1;
-    const span = Math.max(0, searchEndMilliseconds - timeMilliseconds(event.startDate));
+    const ruleEndMilliseconds = rule.until
+      ? Math.min(searchEndMilliseconds, timeMilliseconds(rule.until))
+      : searchEndMilliseconds;
+    const span = Math.max(
+      0,
+      ruleEndMilliseconds - timeMilliseconds(event.startDate)
+    );
     let ruleEstimate = Math.ceil(span / (frequencyMilliseconds * interval)) + 1;
     for (const partName of RECURRENCE_EXPANSION_PARTS) {
       const values = rule.getComponent(partName);
@@ -487,7 +526,8 @@ export async function parseCalendarOccurrences(source, {
   try {
     calendar = new ICAL.Component(ICAL.parse(sourceText));
     eventComponents = calendar.getAllSubcomponents("vevent");
-    registerReferencedIanaTimeZones(calendar, eventComponents);
+    registerReferencedIanaTimeZones(calendar, eventComponents, timeZone);
+    bindFloatingEventTimes(eventComponents, ICAL.TimezoneService.get(timeZone));
   } catch (error) {
     if (error instanceof CalendarDataError) throw error;
     throw new CalendarDataError("malformed_calendar", "Calendar data is malformed.");

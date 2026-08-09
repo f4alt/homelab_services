@@ -141,6 +141,33 @@ END:VCALENDAR\r
   assert.equal(events[0].end, "2026-10-31T15:00:00.000Z");
 });
 
+test("calendar parsing binds floating events to the browser timezone across DST", async () => {
+  const source = `BEGIN:VCALENDAR\r
+VERSION:2.0\r
+BEGIN:VEVENT\r
+UID:floating@example.test\r
+DTSTART:20261031T090000\r
+DTEND:20261031T100000\r
+RRULE:FREQ=DAILY;COUNT=3\r
+SUMMARY:Floating local time\r
+END:VEVENT\r
+END:VCALENDAR\r
+`;
+
+  const events = await parseCalendarOccurrences(source, {
+    rangeStart: new Date("2026-10-30T00:00:00.000Z"),
+    rangeEnd: new Date("2026-11-03T00:00:00.000Z"),
+    timeZone: "America/Chicago",
+    maxOccurrences: 10
+  });
+
+  assert.deepEqual(events.map((event) => event.start), [
+    "2026-10-31T14:00:00.000Z",
+    "2026-11-01T15:00:00.000Z",
+    "2026-11-02T15:00:00.000Z"
+  ]);
+});
+
 test("calendar RDATE keeps literal all-day duration across DST changes", async () => {
   const source = `BEGIN:VCALENDAR\r
 VERSION:2.0\r
@@ -277,4 +304,26 @@ END:VCALENDAR\r
     parseCalendarOccurrences(excessiveRdates, { ...options, maxOccurrences: 2 }),
     { code: "occurrence_limit_exceeded" }
   );
+});
+
+test("calendar recurrence scan estimates honor an early UNTIL", async () => {
+  const source = `BEGIN:VCALENDAR\r
+VERSION:2.0\r
+BEGIN:VEVENT\r
+UID:historical@example.test\r
+DTSTART:20200101T000000Z\r
+DTEND:20200101T000100Z\r
+RRULE:FREQ=MINUTELY;UNTIL=20200101T010000Z\r
+SUMMARY:Short historical series\r
+END:VEVENT\r
+END:VCALENDAR\r
+`;
+
+  const events = await parseCalendarOccurrences(source, {
+    rangeStart: new Date("2026-08-09T00:00:00.000Z"),
+    rangeEnd: new Date("2026-08-12T00:00:00.000Z"),
+    maxOccurrences: 10
+  });
+
+  assert.deepEqual(events, []);
 });
