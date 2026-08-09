@@ -52,6 +52,7 @@ Important environment knobs are documented in `.env.example`, including:
 - `STATUS_PROBE_CONCURRENCY`
 - `STATUS_PROBE_ALLOWED_HOSTS`
 - `NETSTATS_PING_TARGET`
+- `SYSTEM_HEALTH_CONTAINER_API_URL`
 
 The default status-probe allowlist is intentionally minimal: `localhost`. Add
 LAN hosts or patterns locally only when a widget needs them.
@@ -109,6 +110,7 @@ Current Gateway routes include:
 - `GET /api/net/ping`
 - `GET /api/net/speedtest`
 - `POST /api/statuschecks`
+- `GET /api/system-health`
 - `POST /api/home-assistant/actions`
 - `GET /api/todos/health`
 - `GET /api/todos/tasks`
@@ -129,6 +131,26 @@ relative `/api/services/script/dashboard_*` action paths; expose only dedicated,
 low-consequence Home Assistant scripts that use the reserved `dashboard_`
 script ID prefix. `props.dashboardUrl` is a separate browser-reachable URL for
 opening the full Home Assistant dashboard.
+
+The `system-health` widget reads CPU, memory, disk, temperature, and uptime from
+the Linux data already visible to the Gateway container. A dedicated
+`docker_socket_proxy` Compose service supplies container counts over an internal
+network. The proxy permits only `GET` and `HEAD` requests to Docker's container
+API; the Gateway never mounts the Docker socket. A read-only socket bind alone
+would not make Docker operations read-only. Override
+`SYSTEM_HEALTH_CONTAINER_API_URL` only when an equivalent restricted proxy is
+available elsewhere. The tile shows an attention state when a CPU temperature
+sensor or container proxy is unavailable.
+
+### Container-health security boundary
+
+The socket proxy is a deliberate platform exception to the usual widget touch
+points. Docker does not provide container state without daemon access, while a
+direct socket mount would give the larger Gateway process host-control
+capabilities. The dedicated proxy keeps that capability in a small internal
+service and rejects mutation and non-container API requests. Its policy is
+verified against the running Compose stack by
+`node tests/verify-container-proxy.mjs`.
 
 The dedicated `time-since` widget shows tracked Todo activities in backend
 order, provides local source-file filtering, colors only the elapsed-day value
@@ -160,6 +182,7 @@ In another terminal:
 
 ```sh
 node tests/smoke.mjs
+node tests/verify-container-proxy.mjs
 ```
 
 ## Deferred Widget Work

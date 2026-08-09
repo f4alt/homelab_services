@@ -52,6 +52,12 @@ window.DASH_CONFIG = {
       }
     },
     {
+      type: "system-health",
+      id: "system_health",
+      width: 1,
+      refreshMs: 30000
+    },
+    {
       type: "countdown",
       id: "countdowns",
       width: 1,

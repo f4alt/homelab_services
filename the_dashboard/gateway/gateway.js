@@ -6,6 +6,7 @@ import homeAssistant from "./widget-routes/home-assistant.js";
 import metar from "./widget-routes/metar.js";
 import netstats from "./widget-routes/netstats.js";
 import status from "./widget-routes/status.js";
+import systemHealth from "./widget-routes/system-health.js";
 import todos from "./widget-routes/todos.js";
 
 const app = express();
@@ -17,6 +18,7 @@ app.use("/api", homeAssistant);
 app.use("/api", metar);
 app.use("/api", netstats);
 app.use("/api", status);
+app.use("/api", systemHealth);
 app.use("/api", todos);
 
 app.listen(CONFIG.port, () => {

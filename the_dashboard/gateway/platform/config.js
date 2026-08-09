@@ -16,6 +16,8 @@ function parseCsv(env, name, fallback) {
 
 function parseUrlBase(env, name, fallback) {
   const raw = String(env[name] || fallback).trim();
+  if (!raw) return "";
+
   const withProtocol = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
   const url = new URL(withProtocol);
 
@@ -65,6 +67,9 @@ function readGatewayConfig(env = process.env) {
     dashboardConfigPath: "/dashboard/config.js",
     dashboardConfigValidatorPath: "/dashboard/platform/config-validator.mjs",
     upstreamTimeoutMs: parsePositiveInt(env, "GATEWAY_UPSTREAM_TIMEOUT_MS", 5000),
+    systemHealth: {
+      containerApiUrl: parseUrlBase(env, "SYSTEM_HEALTH_CONTAINER_API_URL", "")
+    },
     statusProbe: {
       timeoutMs: parsePositiveInt(env, "STATUS_PROBE_TIMEOUT_MS", 5000),
       maxTargets: parsePositiveInt(env, "STATUS_PROBE_MAX_TARGETS", 100),

@@ -194,6 +194,20 @@ check("network ping route rejects disallowed targets", async () => {
   assert(json?.error?.code === "target_not_allowed", "disallowed ping error code mismatch");
 });
 
+check("system health route returns core host readings", async () => {
+  const { response, json } = await request("/api/system-health");
+
+  assert(response.ok, `expected HTTP 2xx, got ${response.status}`);
+  assert(json?.ok === true, "system health response did not report ok=true");
+  assert(Number.isFinite(json?.data?.cpu?.usagePercent), "CPU usage was unavailable");
+  assert(Number.isFinite(json?.data?.memory?.usedPercent), "memory usage was unavailable");
+  assert(Number.isFinite(json?.data?.disk?.usedPercent), "disk usage was unavailable");
+  assert(Number.isFinite(json?.data?.uptimeSeconds), "uptime was unavailable");
+  assert(Number.isFinite(json?.data?.containers?.total), "container total was unavailable");
+  assert(Number.isFinite(json?.data?.containers?.running), "running count was unavailable");
+  assert(typeof json?.data?.sampledAt === "string", "sample timestamp was unavailable");
+});
+
 check("removed API routes stay absent", async () => {
   const checks = await Promise.all([
     request("/api/health"),
