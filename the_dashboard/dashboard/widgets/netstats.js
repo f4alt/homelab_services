@@ -219,22 +219,21 @@ import { fetchJson, createElement } from "../platform/global.js";
     state.speedBlock.addEventListener("click", handler);
   }
 
-  function attachChartHandlers(state) {
-    const togglePause = () => {
-      state.paused = !state.paused;
-      if (state.paused) {
-        state.svg.classList.add("paused");
-        state.overlay.textContent = "⏸";
-        state.chartWrap.setAttribute("aria-label", "Resume latency polling");
-      } else {
-        state.svg.classList.remove("paused");
-        state.overlay.textContent = "";
-        state.chartWrap.setAttribute("aria-label", "Pause latency polling");
-      }
-      state.chartWrap.setAttribute("aria-pressed", String(state.paused));
-    };
+  function setChartPaused(state, paused) {
+    state.paused = paused;
+    state.svg.classList.toggle("paused", paused);
+    state.overlay.textContent = paused ? "⏸" : "";
+    state.chartWrap.setAttribute(
+      "aria-label",
+      paused ? "Resume latency polling" : "Pause latency polling"
+    );
+    state.chartWrap.setAttribute("aria-pressed", String(paused));
+  }
 
-    state.chartWrap.addEventListener("click", togglePause);
+  function attachChartHandlers(state) {
+    state.chartWrap.addEventListener("click", () => {
+      setChartPaused(state, !state.paused);
+    });
   }
 
   async function refreshIp(state) {
@@ -297,9 +296,10 @@ import { fetchJson, createElement } from "../platform/global.js";
       ensureStyles();
 
       const cfg = {
-        ipRefreshMs:      (props?.ipRefreshMs      ?? 600000),
-        pingIntervalMs:   (props?.pingIntervalMs   ?? 5000),
-        maxSamples:       (props?.maxSamples       ?? 60)
+        ipRefreshMs: props?.ipRefreshMs ?? 600000,
+        pingIntervalMs: props?.pingIntervalMs ?? 5000,
+        maxSamples: props?.maxSamples ?? 60,
+        startPaused: props?.start_paused === true
       };
 
       // parent wrapper
@@ -356,8 +356,6 @@ import { fetchJson, createElement } from "../platform/global.js";
       chartWrap.type = "button";
       chartWrap.className = "net-chart-wrap netstats-chart-button clickable";
       chartWrap.setAttribute("aria-busy", "false");
-      chartWrap.setAttribute("aria-label", "Pause latency polling");
-      chartWrap.setAttribute("aria-pressed", "false");
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.classList.add("net-chart");
       const overlay = document.createElement("span");
@@ -376,7 +374,7 @@ import { fetchJson, createElement } from "../platform/global.js";
       wrap.appendChild(right);
       root.replaceChildren(wrap);
 
-      return {
+      const state = {
         cfg, root, wrap,
         rowIP, valIP, ipStatus,
         speedBlock, valDL, valUL, valPing, speedStatus,
@@ -391,6 +389,8 @@ import { fetchJson, createElement } from "../platform/global.js";
         hasPingResult: false,
         hasSpeedResult: false
       };
+      setChartPaused(state, cfg.startPaused);
+      return state;
     },
 
     async update(state) {

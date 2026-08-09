@@ -103,7 +103,7 @@ async function flushAsyncWork() {
   await new Promise((resolve) => setImmediate(resolve));
 }
 
-test("netstats prevents overlapping work for each polling operation", async () => {
+test("netstats starts paused when configured and prevents overlapping work", async () => {
   const previous = {
     document: globalThis.document,
     fetch: globalThis.fetch,
@@ -143,12 +143,25 @@ test("netstats prevents overlapping work for each polling operation", async () =
     await import(`../dashboard/widgets/netstats.js?test=${Date.now()}`);
     const root = new FakeElement("section");
     const instance = registration.implementation.mount(root, {
-      props: { ipRefreshMs: 1000, pingIntervalMs: 1000, maxSamples: 5 }
+      props: {
+        ipRefreshMs: 1000,
+        pingIntervalMs: 1000,
+        maxSamples: 5,
+        start_paused: true
+      }
     });
     await registration.implementation.update(instance);
 
     intervalCallbacks[0]();
     intervalCallbacks[0]();
+    intervalCallbacks[1]();
+    intervalCallbacks[1]();
+    assert.deepEqual(requestCounts, { ip: 1, ping: 0, speed: 0 });
+    assert.equal(instance.chartWrap.getAttribute("aria-pressed"), "true");
+    assert.equal(instance.chartWrap.getAttribute("aria-label"), "Resume latency polling");
+    assert.equal(instance.overlay.textContent, "⏸");
+
+    instance.chartWrap.fire("click");
     intervalCallbacks[1]();
     intervalCallbacks[1]();
     instance.speedBlock.fire("click");

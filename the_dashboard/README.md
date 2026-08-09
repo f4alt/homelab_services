@@ -70,6 +70,10 @@ setting to choose when a tracked activity changes from its normal age color to
 the warning color. Values must be greater than `0` and no more than `1`; the
 widget defaults invalid values to `0.8`.
 
+Set the `netstats` widget's `props.start_paused` option to `true` to show the
+latency graph in its paused state without gathering latency samples until it is
+resumed. Public IP refreshes and manually started speed tests remain available.
+
 ### Browser Config Editor
 
 For quick config edits, open `/config`. Nginx directly serves the lightweight
