@@ -4,6 +4,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { pathToFileURL } from "node:url";
 import { CONFIG } from "../config.js";
+import { writeConfigFile } from "../config-file.js";
 import { sendError, sendOk } from "../responses.js";
 
 const router = express.Router();
@@ -71,19 +72,6 @@ async function validateSource(source) {
   };
 }
 
-async function writeConfigSource(source) {
-  const dir = path.dirname(CONFIG_PATH);
-  const tempPath = path.join(dir, `.config.js.${Date.now()}.${process.pid}.tmp`);
-
-  try {
-    await fs.writeFile(tempPath, source, { encoding: "utf8", mode: 0o644 });
-    await fs.rename(tempPath, CONFIG_PATH);
-  } catch (err) {
-    await fs.unlink(tempPath).catch(() => {});
-    throw err;
-  }
-}
-
 router.get("/config", async (_req, res) => {
   try {
     const source = await fs.readFile(CONFIG_PATH, "utf8");
@@ -111,7 +99,7 @@ router.put("/config", async (req, res) => {
   }
 
   try {
-    await writeConfigSource(source);
+    await writeConfigFile(CONFIG_PATH, source);
     return sendOk(res, result);
   } catch (err) {
     return sendError(res, 500, "config_write_failed", "Unable to write dashboard config.", {
