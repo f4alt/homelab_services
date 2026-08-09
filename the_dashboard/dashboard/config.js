@@ -31,7 +31,7 @@ window.DASH_CONFIG = {
           },
           {
             name: "Inventory",
-            buildUrl: (q) => "192.168.1.45/items?q=" + encodeURIComponent(q)
+            buildUrl: (q) => "http://localhost/items?q=" + encodeURIComponent(q)
           },
         ]
       }
@@ -52,12 +52,6 @@ window.DASH_CONFIG = {
       }
     },
     {
-      type: "system-health",
-      id: "system_health",
-      width: 1,
-      refreshMs: 30000
-    },
-    {
       type: "calendar",
       id: "calendar",
       width: 1,
@@ -67,16 +61,53 @@ window.DASH_CONFIG = {
       }
     },
     {
+      type: "system-health",
+      id: "system_health",
+      width: "all",
+      refreshMs: 30000
+    },
+    {
       type: "status",
       id: "status",
-      width: "all",
+      width: 1,
       refreshMs: 30000,
       props: {
         tile_minWidth: 220,
         services: [
           { name: "Router", icon: "🛜", url: "192.168.1.1" },
-          { name: "Pi-hole", icon: "🛡️", url: "http://192.168.1.36/admin/" },
+          { name: "Pi-hole", icon: "🛡️", url: "http://localhost/admin/" },
+          { name: "Syncthing", icon: "🗘", url: "http://localhost:18086" },
+          { name: "Home Assistant", icon: "🏠", url: "http://localhost:8123" },
         ]
+      }
+    },
+    {
+      type: "netstats",
+      id: "netstats",
+      width: 1,
+      refreshMs: 0,
+      props: {
+        ipRefreshMs: 600000,
+        pingIntervalMs: 5000,
+        maxSamples: 60
+      }
+    },
+    {
+      type: "todos",
+      id: "todos",
+      width: 1,
+      refreshMs: 60000,
+      props: {
+        defaultList: "homelab.org"
+      }
+    },
+    {
+      type: "time-since",
+      id: "time_since",
+      width: 1,
+      refreshMs: 60000,
+      props: {
+        approachingRatio: 0.8
       }
     },
     {
@@ -89,14 +120,15 @@ window.DASH_CONFIG = {
       }
     },
     {
-      type: "netstats",
-      id: "netstats",
+      type: "home-assistant",
+      id: "home_assistant",
       width: "all",
       refreshMs: 0,
       props: {
-        ipRefreshMs: 600000,
-        pingIntervalMs: 5000,
-        maxSamples: 60
+        dashboardUrl: "http://192.168.1.36:8123/",
+        buttons: [
+          {name: "Dummy button", api: ""},
+        ]
       }
     },
     {
@@ -105,34 +137,6 @@ window.DASH_CONFIG = {
       width: "all",
       props: {
         text: "GitHub CI intent placeholder. This likely belongs in a dedicated status instance if CI targets would inflate the current status widget."
-      }
-    },
-    {
-      type: "todos",
-      id: "todos",
-      width: "all",
-      refreshMs: 60000,
-      props: {
-        defaultList: "homelab.org"
-      }
-    },
-    {
-      type: "time-since",
-      id: "time_since",
-      width: "all",
-      refreshMs: 60000,
-      props: {
-        approachingRatio: 0.8
-      }
-    },
-    {
-      type: "home-assistant",
-      id: "home_assistant",
-      width: "all",
-      refreshMs: 0,
-      props: {
-        dashboardUrl: "http://192.168.1.36:8123/",
-        buttons: []
       }
     },
   ]
