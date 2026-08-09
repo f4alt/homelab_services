@@ -132,10 +132,14 @@ window.DASH_CONFIG = {
       }
     },
     {
-      type: "text",
-      id: "HA_stub",
+      type: "home-assistant",
+      id: "home_assistant",
       width: "all",
-      props: { text: "we want home control buttons here..." }
+      refreshMs: 0,
+      props: {
+        dashboardUrl: "http://192.168.1.36:8123/",
+        buttons: []
+      }
     },
   ]
 };

@@ -44,6 +44,8 @@ Important environment knobs are documented in `.env.example`, including:
 
 - `DASHBOARD_HTTP_PORT`
 - `GATEWAY_UPSTREAM_TIMEOUT_MS`
+- `HOME_ASSISTANT_BASE_URL`
+- `HOME_ASSISTANT_TOKEN`
 - `TODO_API_BASE_URL`
 - `STATUS_PROBE_TIMEOUT_MS`
 - `STATUS_PROBE_MAX_TARGETS`
@@ -107,6 +109,7 @@ Current Gateway routes include:
 - `GET /api/net/ping`
 - `GET /api/net/speedtest`
 - `POST /api/statuschecks`
+- `POST /api/home-assistant/actions`
 - `GET /api/todos/health`
 - `GET /api/todos/tasks`
 - `GET /api/todos/time-since`
@@ -119,6 +122,13 @@ representation.
 
 Widget-domain companions—including status, netstats, METAR, and todos—live in
 `gateway/widget-routes/` and use the same envelope as platform-owned routes.
+
+The `home-assistant` widget keeps its long-lived access token in the Gateway's
+`HOME_ASSISTANT_TOKEN` environment variable. Its configured buttons accept only
+relative `/api/services/script/dashboard_*` action paths; expose only dedicated,
+low-consequence Home Assistant scripts that use the reserved `dashboard_`
+script ID prefix. `props.dashboardUrl` is a separate browser-reachable URL for
+opening the full Home Assistant dashboard.
 
 The dedicated `time-since` widget shows tracked Todo activities in backend
 order, provides local source-file filtering, colors only the elapsed-day value

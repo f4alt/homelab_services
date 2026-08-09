@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { createSuccessResponse } from "./helpers/test-utils.mjs";
+
 class FakeClassList {
   constructor() {
     this.values = new Set();
@@ -93,23 +95,7 @@ function responseFor(url) {
     : url.includes("/ping")
       ? { target: "localhost", ms: 20 }
       : { ping_ms: 20, download_mbps: 100, upload_mbps: 25 };
-  return {
-    ok: true,
-    status: 200,
-    async json() {
-      return { ok: true, data, error: null };
-    }
-  };
-}
-
-function successResponse(data) {
-  return {
-    ok: true,
-    status: 200,
-    async json() {
-      return { ok: true, data, error: null };
-    }
-  };
+  return createSuccessResponse(data);
 }
 
 async function flushAsyncWork() {
@@ -190,19 +176,19 @@ test("netstats preserves readings through failures and clears stale state after 
   const intervalCallbacks = [];
   const responses = {
     ip: [
-      successResponse({ ip: "203.0.113.10" }),
+      createSuccessResponse({ ip: "203.0.113.10" }),
       new Error("IP offline"),
-      successResponse({ ip: "203.0.113.11" })
+      createSuccessResponse({ ip: "203.0.113.11" })
     ],
     ping: [
-      successResponse({ target: "localhost", ms: 20 }),
+      createSuccessResponse({ target: "localhost", ms: 20 }),
       new Error("Ping offline"),
-      successResponse({ target: "localhost", ms: 30 })
+      createSuccessResponse({ target: "localhost", ms: 30 })
     ],
     speed: [
-      successResponse({ ping_ms: 15, download_mbps: 100, upload_mbps: 25 }),
+      createSuccessResponse({ ping_ms: 15, download_mbps: 100, upload_mbps: 25 }),
       new Error("Speed offline"),
-      successResponse({ ping_ms: 18, download_mbps: 120, upload_mbps: 30 })
+      createSuccessResponse({ ping_ms: 18, download_mbps: 120, upload_mbps: 30 })
     ]
   };
   let registration;

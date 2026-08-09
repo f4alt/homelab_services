@@ -156,3 +156,7 @@ export class FakeDocument {
     this.listeners.get(type)?.delete(listener);
   }
 }
+
+export function treeText(element) {
+  return [element.textContent, ...element.children.map(treeText)].join(" ");
+}

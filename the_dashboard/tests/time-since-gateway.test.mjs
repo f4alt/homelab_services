@@ -5,21 +5,7 @@ import {
   getTimeSince,
   normalizeTimeSincePayload
 } from "../gateway/widget-routes/todos.js";
-
-function createResponse() {
-  return {
-    body: null,
-    statusCode: null,
-    status(statusCode) {
-      this.statusCode = statusCode;
-      return this;
-    },
-    json(body) {
-      this.body = body;
-      return body;
-    }
-  };
-}
+import { createGatewayResponse } from "./helpers/test-utils.mjs";
 
 test("time-since Gateway projection always returns an item collection", () => {
   const items = [{ uid: "stable-uid" }];
@@ -44,7 +30,7 @@ test("time-since Gateway handler proxies the upstream path in the stable envelop
   };
 
   try {
-    const response = createResponse();
+    const response = createGatewayResponse();
     await getTimeSince({}, response);
 
     assert.equal(response.statusCode, 200);
@@ -70,7 +56,7 @@ test("time-since Gateway handler translates upstream failures consistently", asy
   });
 
   try {
-    const response = createResponse();
+    const response = createGatewayResponse();
     await getTimeSince({}, response);
 
     assert.equal(response.statusCode, 502);

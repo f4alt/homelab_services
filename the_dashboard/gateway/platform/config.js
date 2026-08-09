@@ -54,6 +54,14 @@ function readGatewayConfig(env = process.env) {
     port: 3000,
     pingTarget: env.PING_TARGET || "8.8.8.8",
     todoBaseUrl: parseUrlBase(env, "TODO_API_BASE_URL", "http://host.docker.internal:5000"),
+    homeAssistant: {
+      baseUrl: parseUrlBase(
+        env,
+        "HOME_ASSISTANT_BASE_URL",
+        "http://host.docker.internal:8123"
+      ),
+      token: String(env.HOME_ASSISTANT_TOKEN || "").trim()
+    },
     dashboardConfigPath: "/dashboard/config.js",
     dashboardConfigValidatorPath: "/dashboard/platform/config-validator.mjs",
     upstreamTimeoutMs: parsePositiveInt(env, "GATEWAY_UPSTREAM_TIMEOUT_MS", 5000),

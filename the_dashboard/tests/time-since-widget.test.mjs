@@ -1,42 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { FakeDocument, FakeElement } from "./helpers/fake-dom.mjs";
+import { FakeDocument, FakeElement, treeText } from "./helpers/fake-dom.mjs";
+import {
+  createDeferred,
+  createErrorResponse,
+  createSuccessResponse
+} from "./helpers/test-utils.mjs";
 
 const NOW_ISO = "2026-08-08T12:00:00Z";
 const DAY_MS = 86_400_000;
 let widgetImportNumber = 0;
-
-function successResponse(data) {
-  return {
-    ok: true,
-    async json() {
-      return { ok: true, data, error: null };
-    }
-  };
-}
-
-function errorResponse(message) {
-  return {
-    ok: false,
-    status: 502,
-    async json() {
-      return {
-        ok: false,
-        data: null,
-        error: { message }
-      };
-    }
-  };
-}
-
-function deferred() {
-  let resolve;
-  const promise = new Promise((resolvePromise) => {
-    resolve = resolvePromise;
-  });
-  return { promise, resolve };
-}
 
 function findByClass(element, className) {
   if (element.classList.contains(className)) return element;
@@ -45,10 +19,6 @@ function findByClass(element, className) {
     if (match) return match;
   }
   return null;
-}
-
-function treeText(element) {
-  return [element.textContent, ...element.children.map(treeText)].join(" ");
 }
 
 async function withTimeSinceWidget(fetchImplementation, run) {
@@ -113,7 +83,7 @@ test("time-since registers and defaults to an ordered aggregate view", async () 
 
   await withTimeSinceWidget(async (url) => {
     requests.push(url);
-    return successResponse({ items });
+    return createSuccessResponse({ items });
   }, async ({ registration }) => {
     const root = new FakeElement("section");
     const state = registration.implementation.mount(root, { props: {} });
@@ -154,7 +124,7 @@ test("time-since source filtering is local", async () => {
 
   await withTimeSinceWidget(async () => {
     requestCount += 1;
-    return successResponse({ items });
+    return createSuccessResponse({ items });
   }, async ({ registration }) => {
     const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
     await registration.implementation.update(state);
@@ -172,7 +142,7 @@ test("time-since source filtering is local", async () => {
 
 test("time-since uses the shared empty state for an empty collection", async () => {
   await withTimeSinceWidget(
-    async () => successResponse({ items: [] }),
+    async () => createSuccessResponse({ items: [] }),
     async ({ registration }) => {
       const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
       await registration.implementation.update(state);
@@ -203,7 +173,7 @@ test("time-since colors only the age token and renders unknown ages", async () =
   ];
 
   await withTimeSinceWidget(
-    async () => successResponse({ items }),
+    async () => createSuccessResponse({ items }),
     async ({ registration }) => {
       const state = registration.implementation.mount(new FakeElement("section"), {
         props: { approachingRatio: 0.8 }
@@ -229,7 +199,7 @@ test("time-since colors only the age token and renders unknown ages", async () =
 });
 
 test("Done now posts the existing update contract, renders zero optimistically, and reloads", async () => {
-  const postResponse = deferred();
+  const postResponse = createDeferred();
   const originalTimestamp = new Date(Date.now() - (5 * DAY_MS)).toISOString();
   const authoritativeTimestamp = new Date(Date.now() - DAY_MS).toISOString();
   const requests = [];
@@ -240,7 +210,7 @@ test("Done now posts the existing update contract, renders zero optimistically, 
     if (options.method === "POST") return postResponse.promise;
 
     getCount += 1;
-    return successResponse({
+    return createSuccessResponse({
       items: [{
         uid: "filter",
         name: "Change the AC filter",
@@ -268,7 +238,7 @@ test("Done now posts the existing update contract, renders zero optimistically, 
       status: "DONE"
     });
 
-    postResponse.resolve(successResponse({ task: { uid: "filter", status: "TODO" } }));
+    postResponse.resolve(createSuccessResponse({ task: { uid: "filter", status: "TODO" } }));
     await action;
 
     assert.equal(getCount, 2);
@@ -283,11 +253,11 @@ test("Done now restores the prior item and shows the shared error state on failu
 
   await withTimeSinceWidget(async (_url, options = {}) => {
     if (options.method === "POST") {
-      return errorResponse("Unable to update todo.");
+      return createErrorResponse("Unable to update todo.");
     }
 
     getCount += 1;
-    return successResponse({
+    return createSuccessResponse({
       items: [{
         uid: "filter",
         name: "Change the AC filter",
@@ -316,12 +286,12 @@ test("Done now retains the optimistic completion when only the authoritative rel
 
   await withTimeSinceWidget(async (_url, options = {}) => {
     if (options.method === "POST") {
-      return successResponse({ task: { uid: "filter", status: "TODO" } });
+      return createSuccessResponse({ task: { uid: "filter", status: "TODO" } });
     }
 
     getCount += 1;
-    if (getCount > 1) return errorResponse("Authoritative reload failed.");
-    return successResponse({
+    if (getCount > 1) return createErrorResponse("Authoritative reload failed.");
+    return createSuccessResponse({
       items: [{
         uid: "filter",
         name: "Change the AC filter",
@@ -344,8 +314,8 @@ test("Done now retains the optimistic completion when only the authoritative rel
 });
 
 test("overlapping Done now actions keep optimistic and authoritative state isolated by UID", async () => {
-  const firstPost = deferred();
-  const secondPost = deferred();
+  const firstPost = createDeferred();
+  const secondPost = createDeferred();
   const originalTimestamp = new Date(Date.now() - (5 * DAY_MS)).toISOString();
   const authoritativeTimestamp = new Date(Date.now() - DAY_MS).toISOString();
   let getCount = 0;
@@ -357,7 +327,7 @@ test("overlapping Done now actions keep optimistic and authoritative state isola
     }
 
     getCount += 1;
-    return successResponse({
+    return createSuccessResponse({
       items: [
         {
           uid: "first",
@@ -388,7 +358,7 @@ test("overlapping Done now actions keep optimistic and authoritative state isola
       "time-since-done-button"
     ).fireAsync("click");
 
-    firstPost.resolve(successResponse({ task: { uid: "first", status: "TODO" } }));
+    firstPost.resolve(createSuccessResponse({ task: { uid: "first", status: "TODO" } }));
     await firstAction;
 
     assert.equal(
@@ -396,7 +366,7 @@ test("overlapping Done now actions keep optimistic and authoritative state isola
       "0"
     );
 
-    secondPost.resolve(errorResponse("Second update failed."));
+    secondPost.resolve(createErrorResponse("Second update failed."));
     await secondAction;
 
     assert.equal(state.items[0].last_done, authoritativeTimestamp);
@@ -415,7 +385,7 @@ test("unchanged refreshes reuse source choices, rows, and row handlers", async (
   };
 
   await withTimeSinceWidget(
-    async () => successResponse({ items: [item] }),
+    async () => createSuccessResponse({ items: [item] }),
     async ({ registration }) => {
       const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
       await registration.implementation.update(state);
@@ -436,13 +406,13 @@ test("unchanged refreshes reuse source choices, rows, and row handlers", async (
 });
 
 test("overlapping refresh requests are serialized and coalesced per instance", async () => {
-  const firstResponse = deferred();
+  const firstResponse = createDeferred();
   let requestCount = 0;
 
   await withTimeSinceWidget(async () => {
     requestCount += 1;
     if (requestCount === 1) return firstResponse.promise;
-    return successResponse({
+    return createSuccessResponse({
       items: [{
         uid: "latest",
         name: "Latest activity",
@@ -457,7 +427,7 @@ test("overlapping refresh requests are serialized and coalesced per instance", a
     const secondUpdate = registration.implementation.update(state);
 
     assert.equal(requestCount, 1);
-    firstResponse.resolve(successResponse({ items: [] }));
+    firstResponse.resolve(createSuccessResponse({ items: [] }));
     await Promise.all([firstUpdate, secondUpdate]);
 
     assert.equal(requestCount, 2);
@@ -486,7 +456,7 @@ test("repeated updates keep one handler, add no timer, and reset a missing sourc
 
   await withTimeSinceWidget(async () => {
     requestCount += 1;
-    return successResponse({ items: requestCount === 1 ? firstItems : [firstItems[0]] });
+    return createSuccessResponse({ items: requestCount === 1 ? firstItems : [firstItems[0]] });
   }, async ({ fakeDocument, getIntervalCallCount, registration }) => {
     const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
     await registration.implementation.update(state);
@@ -521,7 +491,7 @@ test("two time-since instances keep their source filters independent", async () 
   ];
 
   await withTimeSinceWidget(
-    async () => successResponse({ items }),
+    async () => createSuccessResponse({ items }),
     async ({ registration }) => {
       const firstState = registration.implementation.mount(new FakeElement("section"), { props: {} });
       const secondState = registration.implementation.mount(new FakeElement("section"), { props: {} });
