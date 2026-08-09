@@ -74,6 +74,7 @@ window.DASH_CONFIG = {
         tile_minWidth: 220,
         services: [
           { name: "Router", icon: "🛜", url: "192.168.1.1" },
+          { name: "Pi-hole", icon: "🛡️", url: "http://192.168.1.36/admin/" },
         ]
       }
     },

@@ -205,7 +205,7 @@ test("Clocks use the shared large-value typography for time", async () => {
   }
 });
 
-test("dashboard config keeps network status, Home Assistant, and intentional placeholders", async () => {
+test("dashboard config keeps service status, Home Assistant, and intentional placeholders", async () => {
   const source = await readFile(new URL("../dashboard/config.js", import.meta.url), "utf8");
   const context = vm.createContext({ window: {} });
   vm.runInContext(source, context);
@@ -214,8 +214,11 @@ test("dashboard config keeps network status, Home Assistant, and intentional pla
   const status = widgets.find((widget) => widget.id === "status");
   assert.deepEqual(
     Array.from(status.props.services, (service) => service.name),
-    ["Router"]
+    ["Router", "Pi-hole"]
   );
+
+  const pihole = status.props.services.find((service) => service.name === "Pi-hole");
+  assert.equal(pihole.url, "http://192.168.1.36/admin/");
 
   const placeholderIds = widgets
     .filter((widget) => widget.type === "text")
