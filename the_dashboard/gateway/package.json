@@ -5,8 +5,11 @@
   "type": "module",
   "main": "gateway.js",
   "license": "MIT",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "node-ical": "^0.26.1"
   }
 }

@@ -1,0 +1,166 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { parseCalendarOccurrences } from "../gateway/widget-routes/calendar-data.js";
+
+const CALENDAR_SOURCE = `BEGIN:VCALENDAR\r
+VERSION:2.0\r
+PRODID:-//Dashboard Tests//EN\r
+BEGIN:VEVENT\r
+UID:all-day@example.test\r
+DTSTART;VALUE=DATE:20260809\r
+DTEND;VALUE=DATE:20260812\r
+SUMMARY:Conference\r
+END:VEVENT\r
+BEGIN:VEVENT\r
+UID:recurring@example.test\r
+DTSTART;TZID=America/Chicago:20260809T090000\r
+DTEND;TZID=America/Chicago:20260809T100000\r
+RRULE:FREQ=DAILY;COUNT=4\r
+RDATE;TZID=America/Chicago:20260814T090000\r
+EXDATE;TZID=America/Chicago:20260810T090000\r
+SUMMARY:Standup\r
+END:VEVENT\r
+BEGIN:VEVENT\r
+UID:recurring@example.test\r
+RECURRENCE-ID;TZID=America/Chicago:20260811T090000\r
+DTSTART;TZID=America/Chicago:20260811T120000\r
+DTEND;TZID=America/Chicago:20260811T130000\r
+SUMMARY:Moved standup\r
+END:VEVENT\r
+BEGIN:VEVENT\r
+UID:recurring@example.test\r
+RECURRENCE-ID;TZID=America/Chicago:20260812T090000\r
+DTSTART;TZID=America/Chicago:20260812T090000\r
+DTEND;TZID=America/Chicago:20260812T100000\r
+STATUS:CANCELLED\r
+SUMMARY:Cancelled standup\r
+END:VEVENT\r
+BEGIN:VEVENT\r
+UID:cancelled@example.test\r
+DTSTART:20260813T140000Z\r
+DTEND:20260813T150000Z\r
+STATUS:CANCELLED\r
+SUMMARY:Cancelled event\r
+END:VEVENT\r
+BEGIN:VEVENT\r
+UID:untitled@example.test\r
+DTSTART:20260815T140000Z\r
+DTEND:20260815T150000Z\r
+END:VEVENT\r
+END:VCALENDAR\r
+`;
+
+test("calendar parsing returns bounded normalized occurrences with RFC recurrence semantics", async () => {
+  const occurrences = await parseCalendarOccurrences(CALENDAR_SOURCE, {
+    rangeStart: new Date("2026-08-08T00:00:00.000Z"),
+    rangeEnd: new Date("2026-08-16T00:00:00.000Z"),
+    maxOccurrences: 20
+  });
+
+  assert.deepEqual(
+    occurrences.map((event) => event.title),
+    ["Conference", "Standup", "Moved standup", "Standup", "Untitled event"]
+  );
+  assert.deepEqual(occurrences[0], {
+    id: "all-day@example.test:2026-08-09",
+    title: "Conference",
+    allDay: true,
+    startDate: "2026-08-09",
+    endDateExclusive: "2026-08-12",
+    feedOrder: 0
+  });
+  assert.equal(occurrences[1].start, "2026-08-09T14:00:00.000Z");
+  assert.equal(occurrences[2].start, "2026-08-11T17:00:00.000Z");
+  assert.equal(occurrences[3].start, "2026-08-14T14:00:00.000Z");
+  assert.equal(occurrences[1].feedOrder, 1);
+  assert.equal(occurrences[2].feedOrder, 1);
+  assert.equal(new Set(occurrences.map((event) => event.id)).size, occurrences.length);
+  assert.equal(occurrences.some((event) => event.title.includes("Cancelled")), false);
+});
+
+test("calendar parsing rejects malformed input and occurrence explosions", async () => {
+  await assert.rejects(
+    parseCalendarOccurrences("not a calendar", {
+      rangeStart: new Date("2026-08-08T00:00:00.000Z"),
+      rangeEnd: new Date("2026-08-16T00:00:00.000Z"),
+      maxOccurrences: 20
+    }),
+    { code: "malformed_calendar" }
+  );
+
+  await assert.rejects(
+    parseCalendarOccurrences(CALENDAR_SOURCE, {
+      rangeStart: new Date("2026-08-08T00:00:00.000Z"),
+      rangeEnd: new Date("2026-08-16T00:00:00.000Z"),
+      maxOccurrences: 2
+    }),
+    { code: "occurrence_limit_exceeded" }
+  );
+});
+
+test("calendar parsing honors a hosted VTIMEZONE definition", async () => {
+  const source = `BEGIN:VCALENDAR\r
+VERSION:2.0\r
+BEGIN:VTIMEZONE\r
+TZID:Custom Central\r
+BEGIN:STANDARD\r
+DTSTART:19701101T020000\r
+RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU\r
+TZOFFSETFROM:-0500\r
+TZOFFSETTO:-0600\r
+END:STANDARD\r
+BEGIN:DAYLIGHT\r
+DTSTART:19700308T020000\r
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU\r
+TZOFFSETFROM:-0600\r
+TZOFFSETTO:-0500\r
+END:DAYLIGHT\r
+END:VTIMEZONE\r
+BEGIN:VEVENT\r
+UID:custom-zone@example.test\r
+DTSTART;TZID=Custom Central:20260809T090000\r
+DTEND;TZID=Custom Central:20260809T100000\r
+SUMMARY:Custom zone\r
+END:VEVENT\r
+END:VCALENDAR\r
+`;
+
+  const [event] = await parseCalendarOccurrences(source, {
+    rangeStart: new Date("2026-08-09T00:00:00.000Z"),
+    rangeEnd: new Date("2026-08-10T00:00:00.000Z"),
+    maxOccurrences: 10
+  });
+
+  assert.equal(event.start, "2026-08-09T14:00:00.000Z");
+  assert.equal(event.end, "2026-08-09T15:00:00.000Z");
+});
+
+test("calendar RDATE keeps literal all-day duration across DST changes", async () => {
+  const source = `BEGIN:VCALENDAR\r
+VERSION:2.0\r
+BEGIN:VEVENT\r
+UID:rdate-all-day@example.test\r
+DTSTART;VALUE=DATE:20260307\r
+DTEND;VALUE=DATE:20260310\r
+RDATE;VALUE=DATE:20261031\r
+SUMMARY:Three days\r
+END:VEVENT\r
+END:VCALENDAR\r
+`;
+
+  const events = await parseCalendarOccurrences(source, {
+    rangeStart: new Date("2026-10-30T00:00:00.000Z"),
+    rangeEnd: new Date("2026-11-05T00:00:00.000Z"),
+    timeZone: "America/Chicago",
+    maxOccurrences: 10
+  });
+
+  assert.deepEqual(events.map(({ startDate, endDateExclusive }) => ({
+    startDate,
+    endDateExclusive
+  })), [{
+    startDate: "2026-10-31",
+    endDateExclusive: "2026-11-03"
+  }]);
+});

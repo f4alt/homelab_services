@@ -58,17 +58,12 @@ window.DASH_CONFIG = {
       refreshMs: 30000
     },
     {
-      type: "countdown",
-      id: "countdowns",
+      type: "calendar",
+      id: "calendar",
       width: 1,
-      refreshMs: 60000,
+      refreshMs: 300000,
       props: {
-        includeFederal: true,
-        federalCount: 1,
-        events: [
-          { label: "New Year", date: "01/01" },
-          // { label: "Domain Expires", date: "12/31/2026" },
-        ]
+        feedUrl: "https://calendar.google.com/calendar/ical/en.usa%23holiday%40group.v.calendar.google.com/public/basic.ics"
       }
     },
     {
@@ -102,14 +97,6 @@ window.DASH_CONFIG = {
         ipRefreshMs: 600000,
         pingIntervalMs: 5000,
         maxSamples: 60
-      }
-    },
-    {
-      type: "text",
-      id: "calendar_stub",
-      width: "all",
-      props: {
-        text: "Calendar intent placeholder. This may fold into countdown if it stays date/event focused, or into todos if it becomes agenda/action oriented."
       }
     },
     {

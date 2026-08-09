@@ -106,6 +106,7 @@ Current Gateway routes include:
 
 - `GET /api/config`
 - `PUT /api/config`
+- `GET /api/calendar/events`
 - `GET /api/net/myip`
 - `GET /api/net/ping`
 - `GET /api/net/speedtest`
@@ -124,6 +125,13 @@ representation.
 
 Widget-domain companions—including status, netstats, METAR, and todos—live in
 `gateway/widget-routes/` and use the same envelope as platform-owned routes.
+
+The `calendar` widget reads one public iCalendar subscription from
+`props.feedUrl`. The Gateway validates and pins public DNS destinations,
+revalidates redirects, bounds downloads and recurrence expansion, and returns
+only normalized event titles and times. Replace the non-secret example feed in
+`dashboard/config.js` directly; private and credential-bearing feeds are not
+supported.
 
 The `home-assistant` widget keeps its long-lived access token in the Gateway's
 `HOME_ASSISTANT_TOKEN` environment variable. Its configured buttons accept only
