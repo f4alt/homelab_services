@@ -63,7 +63,7 @@ window.DASH_CONFIG = {
       width: 1,
       refreshMs: 300000,
       props: {
-        feedUrl: "https://calendar.google.com/calendar/ical/en.usa%23holiday%40group.v.calendar.google.com/public/basic.ics"
+        feedUrl: "webcal://p166-caldav.icloud.com/published/2/MTEwODg1NDQxMTExMDg4NdzOHAY8veWOp1tk91cymB1QDT2vHydPJDsh5WVZQaVu"
       }
     },
     {
