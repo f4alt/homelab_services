@@ -3,6 +3,7 @@ import {
   createResponsiveGrid,
   createTile,
   fetchJson,
+  installWidgetStyles,
   setStateMessage
 } from "../platform/global.js";
 
@@ -26,14 +27,9 @@ const METRICS = Object.freeze([
   { key: "uptime", label: "Uptime" },
   { key: "containers", label: "Containers" }
 ]);
-const STYLE_ELEMENT_ID = "system-health-styles";
+const SYSTEM_HEALTH_STYLE_ID = "system-health-styles";
 
-function ensureStyles() {
-  if (document.getElementById(STYLE_ELEMENT_ID)) return;
-
-  const style = document.createElement("style");
-  style.id = STYLE_ELEMENT_ID;
-  style.textContent = `
+const SYSTEM_HEALTH_STYLES = `
     .system-health-tile {
       display: flex;
       flex-direction: column;
@@ -49,18 +45,7 @@ function ensureStyles() {
     .system-health-metric {
       min-width: 0;
     }
-
-    .system-health-warning {
-      white-space: normal;
-    }
-
-    .system-health-warning:empty {
-      display: none;
-    }
-
   `;
-  document.head.appendChild(style);
-}
 
 function finiteNumber(value) {
   if (value === null || value === undefined || value === "" || typeof value === "boolean") {
@@ -242,7 +227,7 @@ function showRefreshFailure(state, message) {
 
 window.DASH.registerWidget("system-health", {
   mount(root, { props = {} }) {
-    ensureStyles();
+    installWidgetStyles(SYSTEM_HEALTH_STYLE_ID, SYSTEM_HEALTH_STYLES);
 
     const normalizedProps = normalizeProps(props);
     const grid = createResponsiveGrid(props);
@@ -268,7 +253,10 @@ window.DASH.registerWidget("system-health", {
       metrics.appendChild(field);
     }
 
-    const warning = createElement("div", "label-info system-health-warning");
+    const warning = createElement(
+      "div",
+      "label-info system-health-warning widget-status"
+    );
     warning.setAttribute("aria-live", "polite");
     warning.setAttribute("role", "status");
     tile.append(header, metrics, warning);
@@ -301,6 +289,10 @@ window.DASH.registerWidget("system-health", {
       snapshot = await fetchJson("/system-health", {
         fetchOptions: { signal: aborter.signal }
       });
+      if (state.aborter !== aborter || aborter.signal.aborted) return;
+      if (!requiredSnapshotValuesArePresent(snapshot)) {
+        throw new Error("System health response was incomplete.");
+      }
     } catch (error) {
       if (state.aborter !== aborter || aborter.signal.aborted) return;
       showRefreshFailure(
@@ -308,12 +300,10 @@ window.DASH.registerWidget("system-health", {
         String(error?.message || "Unable to load system health.")
       );
       return;
+    } finally {
+      if (state.aborter === aborter) state.aborter = null;
     }
 
-    if (state.aborter !== aborter || aborter.signal.aborted) return;
-    if (!requiredSnapshotValuesArePresent(snapshot)) {
-      throw new Error("System health response was incomplete.");
-    }
     renderSnapshot(state, snapshot);
   }
 });

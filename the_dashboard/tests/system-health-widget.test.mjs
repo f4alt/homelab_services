@@ -1,34 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { FakeDocument, FakeElement, treeText } from "./helpers/fake-dom.mjs";
+import {
+  FakeDocument,
+  FakeElement,
+  findByClass,
+  treeText
+} from "./helpers/fake-dom.mjs";
 import {
   createDeferred,
   createErrorResponse,
-  createSuccessResponse
+  createSuccessResponse,
+  withPatchedGlobals
 } from "./helpers/test-utils.mjs";
 
 let widgetImportNumber = 0;
 
-function findByClass(element, className) {
-  if (element.classList.contains(className)) return element;
-  for (const child of element.children) {
-    const match = findByClass(child, className);
-    if (match) return match;
-  }
-  return null;
-}
-
 async function withSystemHealthWidget(fetchImplementation, run) {
-  const previous = {
-    document: globalThis.document,
-    fetch: globalThis.fetch,
-    window: globalThis.window
-  };
   let registration;
-  globalThis.document = new FakeDocument();
-  globalThis.fetch = fetchImplementation;
-  globalThis.window = {
+  const window = {
     DASH_CONFIG: { apiBase: "/api" },
     DASH: {
       registerWidget(type, implementation) {
@@ -37,20 +27,19 @@ async function withSystemHealthWidget(fetchImplementation, run) {
     }
   };
 
-  try {
+  await withPatchedGlobals({
+    document: new FakeDocument(),
+    fetch: fetchImplementation,
+    window
+  }, async () => {
     widgetImportNumber += 1;
     await import(`../dashboard/widgets/system-health.js?test=${widgetImportNumber}`);
     await run({ registration });
-  } finally {
-    globalThis.document = previous.document;
-    globalThis.fetch = previous.fetch;
-    globalThis.window = previous.window;
-  }
+  });
 }
 
-test("system-health renders the minimal six-reading tile", async () => {
-  const requests = [];
-  const snapshot = {
+function healthySnapshot() {
+  return {
     sampledAt: new Date().toISOString(),
     cpu: { usagePercent: 18, ioWaitPercent: 0.5 },
     memory: { usedPercent: 61, swapUsedPercent: 0 },
@@ -59,6 +48,11 @@ test("system-health renders the minimal six-reading tile", async () => {
     uptimeSeconds: 1_555_200,
     containers: { total: 11, running: 11, unhealthy: 0, restarting: 0 }
   };
+}
+
+test("system-health renders the minimal six-reading tile", async () => {
+  const requests = [];
+  const snapshot = healthySnapshot();
 
   await withSystemHealthWidget(async (url) => {
     requests.push(url);
@@ -256,4 +250,50 @@ test("system-health ignores an older response after a newer refresh starts", asy
     assert.match(treeText(root), /CPU\s+22%/);
     assert.equal(treeText(root).includes("99%"), false);
   });
+});
+
+test("system-health treats a malformed first response as an unavailable refresh", async () => {
+  await withSystemHealthWidget(
+    async () => createSuccessResponse({}),
+    async ({ registration }) => {
+      const state = registration.implementation.mount(
+        new FakeElement("section"),
+        { props: {} }
+      );
+
+      await assert.doesNotReject(() => registration.implementation.update(state));
+
+      assert.equal(state.grid.classList.contains("is-error"), true);
+      assert.equal(
+        state.grid.children[0].textContent,
+        "System health response was incomplete."
+      );
+    }
+  );
+});
+
+test("system-health preserves a valid snapshot when a later payload is malformed", async () => {
+  const responses = [
+    createSuccessResponse(healthySnapshot()),
+    createSuccessResponse({})
+  ];
+
+  await withSystemHealthWidget(
+    async () => responses.shift(),
+    async ({ registration }) => {
+      const state = registration.implementation.mount(
+        new FakeElement("section"),
+        { props: {} }
+      );
+      await registration.implementation.update(state);
+
+      await assert.doesNotReject(() => registration.implementation.update(state));
+
+      assert.equal(state.values.cpu.textContent, "18%");
+      assert.equal(
+        state.warning.textContent,
+        "System health response was incomplete. Showing the previous snapshot."
+      );
+    }
+  );
 });
