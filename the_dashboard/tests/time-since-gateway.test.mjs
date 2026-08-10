@@ -5,7 +5,10 @@ import {
   getTimeSince,
   normalizeTimeSincePayload
 } from "../gateway/widget-routes/todos.js";
-import { createGatewayResponse } from "./helpers/test-utils.mjs";
+import {
+  createGatewayResponse,
+  withPatchedGlobals
+} from "./helpers/test-utils.mjs";
 
 test("time-since Gateway projection always returns an item collection", () => {
   const items = [{ uid: "stable-uid" }];
@@ -16,20 +19,20 @@ test("time-since Gateway projection always returns an item collection", () => {
 });
 
 test("time-since Gateway handler proxies the upstream path in the stable envelope", async () => {
-  const previousFetch = globalThis.fetch;
   let upstreamPath;
-  globalThis.fetch = async (url) => {
-    upstreamPath = new URL(url).pathname;
-    return {
-      ok: true,
-      status: 200,
-      async json() {
-        return { items: null };
-      }
-    };
-  };
 
-  try {
+  await withPatchedGlobals({
+    async fetch(url) {
+      upstreamPath = new URL(url).pathname;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { items: null };
+        }
+      };
+    }
+  }, async () => {
     const response = createGatewayResponse();
     await getTimeSince({}, response);
 
@@ -40,22 +43,19 @@ test("time-since Gateway handler proxies the upstream path in the stable envelop
       error: null
     });
     assert.equal(upstreamPath, "/time-since");
-  } finally {
-    globalThis.fetch = previousFetch;
-  }
+  });
 });
 
 test("time-since Gateway handler translates upstream failures consistently", async () => {
-  const previousFetch = globalThis.fetch;
-  globalThis.fetch = async () => ({
-    ok: false,
-    status: 503,
-    async json() {
-      return { error: "Todo server offline" };
-    }
-  });
-
-  try {
+  await withPatchedGlobals({
+    fetch: async () => ({
+      ok: false,
+      status: 503,
+      async json() {
+        return { error: "Todo server offline" };
+      }
+    })
+  }, async () => {
     const response = createGatewayResponse();
     await getTimeSince({}, response);
 
@@ -73,7 +73,5 @@ test("time-since Gateway handler translates upstream failures consistently", asy
         }
       }
     });
-  } finally {
-    globalThis.fetch = previousFetch;
-  }
+  });
 });

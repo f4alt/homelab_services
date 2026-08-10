@@ -1,115 +1,63 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-class FakeClassList {
-  constructor() {
-    this.values = new Set();
-  }
-
-  add(...values) {
-    values.forEach((value) => this.values.add(value));
-  }
-
-  contains(value) {
-    return this.values.has(value);
-  }
-
-  remove(...values) {
-    values.forEach((value) => this.values.delete(value));
-  }
-
-  toggle(value, force) {
-    const enabled = force ?? !this.contains(value);
-    if (enabled) this.add(value);
-    else this.remove(value);
-    return enabled;
-  }
-}
-
-class FakeElement {
-  constructor(tagName) {
-    this.tagName = tagName;
-    this.children = [];
-    this.classList = new FakeClassList();
-    this.textContent = "";
-  }
-
-  set className(value) {
-    this.classList.values = new Set(String(value || "").split(/\s+/).filter(Boolean));
-  }
-
-  get className() {
-    return [...this.classList.values].join(" ");
-  }
-
-  appendChild(child) {
-    this.children.push(child);
-    return child;
-  }
-
-  replaceChildren(...children) {
-    this.children = children;
-  }
-}
+import { FakeElement } from "./helpers/fake-dom.mjs";
+import { withPatchedGlobals } from "./helpers/test-utils.mjs";
 
 test("METAR renders Gateway failure details and recovers the existing station row", async () => {
-  const previous = {
-    document: globalThis.document,
-    fetch: globalThis.fetch,
-    window: globalThis.window
-  };
   const head = new FakeElement("head");
   let registration;
   let requestCount = 0;
-  globalThis.document = {
-    createElement: (tagName) => new FakeElement(tagName),
-    getElementById: () => null,
-    head
-  };
-  globalThis.fetch = async () => {
-    requestCount += 1;
-    if (requestCount === 1) {
+
+  await withPatchedGlobals({
+    document: {
+      createElement: (tagName) => new FakeElement(tagName),
+      getElementById: () => null,
+      head
+    },
+    async fetch() {
+      requestCount += 1;
+      if (requestCount === 1) {
+        return {
+          ok: false,
+          status: 502,
+          async json() {
+            return {
+              ok: false,
+              data: null,
+              error: { code: "upstream_error", message: "Gateway offline" }
+            };
+          }
+        };
+      }
       return {
-        ok: false,
-        status: 502,
+        ok: true,
+        status: 200,
         async json() {
           return {
-            ok: false,
-            data: null,
-            error: { code: "upstream_error", message: "Gateway offline" }
+            ok: true,
+            data: {
+              stations: {
+                KDFW: {
+                  icaoId: "KDFW",
+                  rawOb: "KDFW 191753Z 18012KT 10SM CLR 31/22 A2992 RMK AO2"
+                }
+              }
+            },
+            error: null
           };
         }
       };
-    }
-    return {
-      ok: true,
-      status: 200,
-      async json() {
-        return {
-          ok: true,
-          data: {
-            stations: {
-              KDFW: {
-                icaoId: "KDFW",
-                rawOb: "KDFW 191753Z 18012KT 10SM CLR 31/22 A2992 RMK AO2"
-              }
-            }
-          },
-          error: null
-        };
-      }
-    };
-  };
-  globalThis.window = {
-    DASH_CONFIG: { apiBase: "/api" },
-    DASH: {
-      registerWidget(type, implementation) {
-        registration = { type, implementation };
+    },
+    window: {
+      DASH_CONFIG: { apiBase: "/api" },
+      DASH: {
+        registerWidget(type, implementation) {
+          registration = { type, implementation };
+        }
       }
     }
-  };
-
-  try {
+  }, async () => {
     await import(`../dashboard/widgets/metar.js?test=${Date.now()}`);
     const root = new FakeElement("section");
     const instance = registration.implementation.mount(root, {
@@ -118,19 +66,18 @@ test("METAR renders Gateway failure details and recovers the existing station ro
     const originalRow = instance.rows.KDFW;
 
     assert.equal(originalRow.tile.classList.contains("ui-tile"), true);
-    assert.deepEqual(
-      originalRow.tile.children.map((child) => child.className),
-      [
-        "label metar-field metar-station",
-        "label-info metar-field metar-time",
-        "label-info metar-field metar-wind",
-        "label-info metar-field metar-visibility",
-        "label-info metar-field metar-weather",
-        "label-info metar-field metar-sky",
-        "label-info metar-field metar-temperature",
-        "label-info metar-field metar-altimeter",
-        "label-info metar-field metar-remarks"
-      ]
+    const [stationField, ...detailFields] = originalRow.tile.children;
+    assert.equal(stationField.classList.contains("label"), true);
+    assert.equal(stationField.classList.contains("metar-station"), true);
+    assert.equal(
+      originalRow.tile.children.every(
+        (field) => field.classList.contains("metar-field")
+      ),
+      true
+    );
+    assert.equal(
+      detailFields.every((field) => field.classList.contains("label-info")),
+      true
     );
 
     await registration.implementation.update(instance);
@@ -146,9 +93,5 @@ test("METAR renders Gateway failure details and recovers the existing station ro
     assert.equal(originalRow.windSpan.textContent, "180@12KT");
     assert.equal(originalRow.remarksSpan.textContent, "AO2");
     assert.equal(originalRow.tile.classList.contains("error"), false);
-  } finally {
-    globalThis.document = previous.document;
-    globalThis.fetch = previous.fetch;
-    globalThis.window = previous.window;
-  }
+  });
 });

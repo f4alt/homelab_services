@@ -1,43 +1,32 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { FakeDocument, FakeElement, treeText } from "./helpers/fake-dom.mjs";
+import {
+  FakeDocument,
+  FakeElement,
+  findByClass,
+  treeText
+} from "./helpers/fake-dom.mjs";
 import {
   createDeferred,
   createErrorResponse,
-  createSuccessResponse
+  createSuccessResponse,
+  withPatchedGlobals
 } from "./helpers/test-utils.mjs";
 
 const NOW_ISO = "2026-08-08T12:00:00Z";
 const DAY_MS = 86_400_000;
 let widgetImportNumber = 0;
 
-function findByClass(element, className) {
-  if (element.classList.contains(className)) return element;
-  for (const child of element.children) {
-    const match = findByClass(child, className);
-    if (match) return match;
-  }
-  return null;
-}
-
 async function withTimeSinceWidget(fetchImplementation, run) {
-  const previous = {
-    document: globalThis.document,
-    fetch: globalThis.fetch,
-    setInterval: globalThis.setInterval,
-    window: globalThis.window
-  };
   const fakeDocument = new FakeDocument();
   let intervalCallCount = 0;
   let registration;
-  globalThis.document = fakeDocument;
-  globalThis.fetch = fetchImplementation;
-  globalThis.setInterval = () => {
+  const setInterval = () => {
     intervalCallCount += 1;
     return Symbol("interval");
   };
-  globalThis.window = {
+  const window = {
     DASH_CONFIG: { apiBase: "/api" },
     DASH: {
       registerWidget(type, implementation) {
@@ -46,7 +35,12 @@ async function withTimeSinceWidget(fetchImplementation, run) {
     }
   };
 
-  try {
+  await withPatchedGlobals({
+    document: fakeDocument,
+    fetch: fetchImplementation,
+    setInterval,
+    window
+  }, async () => {
     widgetImportNumber += 1;
     await import(`../dashboard/widgets/time-since.js?test=${widgetImportNumber}`);
     await run({
@@ -54,12 +48,7 @@ async function withTimeSinceWidget(fetchImplementation, run) {
       getIntervalCallCount: () => intervalCallCount,
       registration
     });
-  } finally {
-    globalThis.document = previous.document;
-    globalThis.fetch = previous.fetch;
-    globalThis.setInterval = previous.setInterval;
-    globalThis.window = previous.window;
-  }
+  });
 }
 
 test("time-since registers and defaults to an ordered aggregate view", async () => {

@@ -1,25 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { FakeDocument, FakeElement, treeText } from "./helpers/fake-dom.mjs";
+import {
+  FakeDocument,
+  FakeElement,
+  findAll,
+  findByClass,
+  treeText
+} from "./helpers/fake-dom.mjs";
 import {
   createDeferred,
   createErrorResponse,
-  createSuccessResponse
+  createSuccessResponse,
+  withPatchedGlobals
 } from "./helpers/test-utils.mjs";
 
 let widgetImportNumber = 0;
-
-function findAll(element, predicate) {
-  return [
-    ...(predicate(element) ? [element] : []),
-    ...element.children.flatMap((child) => findAll(child, predicate))
-  ];
-}
-
-function findByClass(element, className) {
-  return findAll(element, (candidate) => candidate.classList.contains(className))[0] || null;
-}
 
 function sampleEvents() {
   return [
@@ -43,16 +39,11 @@ function sampleEvents() {
 }
 
 async function withCalendarWidget(fetchImplementation, run) {
-  const previous = {
-    Date: globalThis.Date,
-    document: globalThis.document,
-    fetch: globalThis.fetch,
-    window: globalThis.window
-  };
-  let now = new previous.Date(2026, 7, 9, 12).getTime();
+  const NativeDate = globalThis.Date;
+  let now = new NativeDate(2026, 7, 9, 12).getTime();
   let registration;
 
-  class FixedDate extends previous.Date {
+  class FixedDate extends NativeDate {
     constructor(...args) {
       super(...(args.length ? args : [now]));
     }
@@ -62,10 +53,7 @@ async function withCalendarWidget(fetchImplementation, run) {
     }
   }
 
-  globalThis.Date = FixedDate;
-  globalThis.document = new FakeDocument();
-  globalThis.fetch = fetchImplementation;
-  globalThis.window = {
+  const window = {
     DASH_CONFIG: { apiBase: "/api" },
     DASH: {
       registerWidget(type, implementation) {
@@ -74,7 +62,12 @@ async function withCalendarWidget(fetchImplementation, run) {
     }
   };
 
-  try {
+  await withPatchedGlobals({
+    Date: FixedDate,
+    document: new FakeDocument(),
+    fetch: fetchImplementation,
+    window
+  }, async () => {
     widgetImportNumber += 1;
     await import(`../dashboard/widgets/calendar.js?test=${widgetImportNumber}`);
     await run({
@@ -83,12 +76,7 @@ async function withCalendarWidget(fetchImplementation, run) {
         now = date.getTime();
       }
     });
-  } finally {
-    globalThis.Date = previous.Date;
-    globalThis.document = previous.document;
-    globalThis.fetch = previous.fetch;
-    globalThis.window = previous.window;
-  }
+  });
 }
 
 test("calendar renders a semantic fixed grid, boolean dots, and the two default countdowns", async () => {

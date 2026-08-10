@@ -2,17 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createDismissibleMenu } from "../dashboard/platform/global.js";
-import { FakeDocument, FakeElement } from "./helpers/fake-dom.mjs";
+import {
+  FakeDocument,
+  FakeElement,
+  findByClass
+} from "./helpers/fake-dom.mjs";
+import { withPatchedGlobals } from "./helpers/test-utils.mjs";
 
-test("dismissible menu toggles ARIA state and keeps listeners only while open", () => {
-  const previousDocument = globalThis.document;
+test("dismissible menu toggles ARIA state and keeps listeners only while open", async () => {
   const fakeDocument = new FakeDocument();
   const trigger = new FakeElement();
   const menu = new FakeElement();
   const changes = [];
-  globalThis.document = fakeDocument;
 
-  try {
+  await withPatchedGlobals({ document: fakeDocument }, async () => {
     const controller = createDismissibleMenu({
       trigger,
       menu,
@@ -38,36 +41,31 @@ test("dismissible menu toggles ARIA state and keeps listeners only while open", 
     assert.equal(fakeDocument.listenerCount("click"), 0);
     assert.equal(fakeDocument.listenerCount("keydown"), 0);
     assert.deepEqual(changes, [true, false]);
-  } finally {
-    globalThis.document = previousDocument;
-  }
+  });
 });
 
 test("search exposes one dismissible listbox and preserves engine selection and submission", async () => {
-  const previous = {
-    document: globalThis.document,
-    window: globalThis.window
-  };
   const fakeDocument = new FakeDocument();
   const opened = [];
   let registration;
-  globalThis.document = fakeDocument;
-  globalThis.window = {
-    DASH: {
-      registerWidget(type, implementation) {
-        registration = { type, implementation };
-      }
-    },
-    open(...args) {
-      opened.push(args);
-      return null;
-    }
-  };
 
-  try {
+  await withPatchedGlobals({
+    document: fakeDocument,
+    window: {
+      DASH: {
+        registerWidget(type, implementation) {
+          registration = { type, implementation };
+        }
+      },
+      open(...args) {
+        opened.push(args);
+        return null;
+      }
+    }
+  }, async () => {
     await import(`../dashboard/widgets/search.js?test=${Date.now()}`);
     const root = new FakeElement("section");
-    const instance = registration.implementation.mount(root, {
+    registration.implementation.mount(root, {
       id: "search_test",
       props: {
         placeholder: "Find it",
@@ -77,87 +75,83 @@ test("search exposes one dismissible listbox and preserves engine selection and 
         ]
       }
     });
-    const [firstItem, secondItem] = instance.menu.children;
+    const engineButton = findByClass(root, "search-engine-btn");
+    const input = findByClass(root, "search-input");
+    const menu = findByClass(root, "search-engine-menu");
+    const [firstItem, secondItem] = menu.children;
 
     assert.equal(registration.type, "search");
-    assert.equal(instance.engineBtn.getAttribute("aria-haspopup"), "listbox");
-    assert.equal(instance.engineBtn.getAttribute("aria-expanded"), "false");
-    assert.equal(instance.menu.getAttribute("role"), "listbox");
+    assert.equal(engineButton.getAttribute("aria-haspopup"), "listbox");
+    assert.equal(engineButton.getAttribute("aria-expanded"), "false");
+    assert.equal(menu.getAttribute("role"), "listbox");
     assert.equal(firstItem.getAttribute("aria-selected"), "true");
     assert.equal(secondItem.getAttribute("aria-selected"), "false");
     assert.equal(fakeDocument.listenerCount("click"), 0);
 
-    instance.engineBtn.fire("click");
-    assert.equal(instance.engineBtn.getAttribute("aria-expanded"), "true");
+    engineButton.fire("click");
+    assert.equal(engineButton.getAttribute("aria-expanded"), "true");
     assert.equal(fakeDocument.listenerCount("click"), 1);
 
     secondItem.fire("click");
-    assert.equal(instance.engineBtn.textContent, "Second");
+    assert.equal(engineButton.textContent, "Second");
     assert.equal(firstItem.getAttribute("aria-selected"), "false");
     assert.equal(secondItem.getAttribute("aria-selected"), "true");
-    assert.equal(instance.engineBtn.getAttribute("aria-expanded"), "false");
-    assert.equal(instance.input.focusCalls, 1);
+    assert.equal(engineButton.getAttribute("aria-expanded"), "false");
+    assert.equal(input.focusCalls, 1);
     assert.equal(fakeDocument.listenerCount("click"), 0);
 
-    instance.input.value = "dashboard";
-    const submitEvent = instance.input.fire("keydown", { key: "Enter" });
+    input.value = "dashboard";
+    const submitEvent = input.fire("keydown", { key: "Enter" });
     assert.equal(submitEvent.defaultPrevented, true);
     assert.deepEqual(opened[0], [
       "/second?q=dashboard",
       "_blank",
       "noopener,noreferrer"
     ]);
-    assert.equal(instance.input.value, "");
+    assert.equal(input.value, "");
 
-    instance.menuController.open();
+    engineButton.fire("click");
     fakeDocument.fire("click", { target: new FakeElement("aside") });
-    assert.equal(instance.menuController.isOpen(), false);
+    assert.equal(engineButton.getAttribute("aria-expanded"), "false");
     assert.equal(fakeDocument.listenerCount("click"), 0);
 
-    instance.menuController.open();
+    engineButton.fire("click");
     fakeDocument.fire("keydown", { key: "Escape" });
-    assert.equal(instance.menuController.isOpen(), false);
-    assert.equal(instance.engineBtn.focusCalls, 1);
-  } finally {
-    globalThis.document = previous.document;
-    globalThis.window = previous.window;
-  }
+    assert.equal(engineButton.getAttribute("aria-expanded"), "false");
+    assert.equal(engineButton.focusCalls, 1);
+  });
 });
 
 test("todos installs dismissal listeners only while its list picker is open", async () => {
-  const previous = {
-    document: globalThis.document,
-    fetch: globalThis.fetch,
-    window: globalThis.window
-  };
   const fakeDocument = new FakeDocument();
   let registration;
-  globalThis.document = fakeDocument;
-  globalThis.fetch = async () => ({
-    ok: true,
-    async json() {
-      return {
-        ok: true,
-        data: {
-          tasks: [
-            { uid: "a", content: "First task", source_file: "alpha.org", status: "TODO" },
-            { uid: "b", content: "Second task", source_file: "beta.org", status: "TODO" }
-          ]
-        },
-        error: null
-      };
-    }
-  });
-  globalThis.window = {
-    DASH_CONFIG: { apiBase: "/api" },
-    DASH: {
-      registerWidget(type, implementation) {
-        registration = { type, implementation };
+
+  await withPatchedGlobals({
+    document: fakeDocument,
+    fetch: async () => ({
+      ok: true,
+      async json() {
+        return {
+          ok: true,
+          data: {
+            tasks: [
+              { uid: "a", content: "First task", source_file: "alpha.org", status: "TODO" },
+              { uid: "b", content: "Second task", source_file: "beta.org", status: "TODO" }
+            ]
+          },
+          error: null
+        };
+      }
+    }),
+    window: {
+      DASH_CONFIG: { apiBase: "/api" },
+      DASH: {
+        registerWidget(type, implementation) {
+          registration = { type, implementation };
+        }
       }
     }
-  };
-
-  try {
+  }, async () => {
     await import(`../dashboard/widgets/todos.js?test=${Date.now()}`);
     const root = new FakeElement("section");
     const instance = registration.implementation.mount(root, {
@@ -189,23 +183,17 @@ test("todos installs dismissal listeners only while its list picker is open", as
     fakeDocument.fire("click", { target: new FakeElement("aside") });
     assert.equal(instance.menuController.isOpen(), false);
     assert.equal(fakeDocument.listenerCount("click"), 0);
-  } finally {
-    globalThis.document = previous.document;
-    globalThis.fetch = previous.fetch;
-    globalThis.window = previous.window;
-  }
+  });
 });
 
-test("dismissible menus keep instance state independent and dismiss outside or on Escape", () => {
-  const previousDocument = globalThis.document;
+test("dismissible menus keep instance state independent and dismiss outside or on Escape", async () => {
   const fakeDocument = new FakeDocument();
   const triggerA = new FakeElement();
   const menuA = new FakeElement();
   const triggerB = new FakeElement();
   const menuB = new FakeElement();
-  globalThis.document = fakeDocument;
 
-  try {
+  await withPatchedGlobals({ document: fakeDocument }, async () => {
     const menuControllerA = createDismissibleMenu({ trigger: triggerA, menu: menuA });
     const menuControllerB = createDismissibleMenu({ trigger: triggerB, menu: menuB });
 
@@ -223,7 +211,5 @@ test("dismissible menus keep instance state independent and dismiss outside or o
     assert.equal(triggerA.focusCalls, 1);
     assert.equal(fakeDocument.listenerCount("click"), 0);
     assert.equal(fakeDocument.listenerCount("keydown"), 0);
-  } finally {
-    globalThis.document = previousDocument;
-  }
+  });
 });

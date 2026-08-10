@@ -1,22 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { FakeDocument, FakeElement, treeText } from "./helpers/fake-dom.mjs";
+import {
+  FakeDocument,
+  FakeElement,
+  findAll,
+  treeText
+} from "./helpers/fake-dom.mjs";
 import {
   createDeferred,
   createErrorResponse,
-  createSuccessResponse
+  createSuccessResponse,
+  withPatchedGlobals
 } from "./helpers/test-utils.mjs";
 
 let widgetImportNumber = 0;
 
-function findAllByTag(element, tagName) {
-  const matches = element.tagName === tagName ? [element] : [];
-  for (const child of element.children) {
-    matches.push(...findAllByTag(child, tagName));
-  }
-  return matches;
-}
+const findAllByTag = (element, tagName) => (
+  findAll(element, (candidate) => candidate.tagName === tagName)
+);
 
 function findByAttribute(element, name, value) {
   if (element.getAttribute(name) === value) return element;
@@ -28,15 +30,8 @@ function findByAttribute(element, name, value) {
 }
 
 async function withHomeAssistantWidget(fetchImplementation, run) {
-  const previous = {
-    document: globalThis.document,
-    fetch: globalThis.fetch,
-    window: globalThis.window
-  };
   let registration;
-  globalThis.document = new FakeDocument();
-  globalThis.fetch = fetchImplementation;
-  globalThis.window = {
+  const window = {
     DASH_CONFIG: { apiBase: "/api" },
     DASH: {
       registerWidget(type, implementation) {
@@ -45,15 +40,15 @@ async function withHomeAssistantWidget(fetchImplementation, run) {
     }
   };
 
-  try {
+  await withPatchedGlobals({
+    document: new FakeDocument(),
+    fetch: fetchImplementation,
+    window
+  }, async () => {
     widgetImportNumber += 1;
     await import(`../dashboard/widgets/home-assistant.js?test=${widgetImportNumber}`);
     await run({ registration });
-  } finally {
-    globalThis.document = previous.document;
-    globalThis.fetch = previous.fetch;
-    globalThis.window = previous.window;
-  }
+  });
 }
 
 test("home-assistant registers as a static widget and renders a safe dashboard link", async () => {
