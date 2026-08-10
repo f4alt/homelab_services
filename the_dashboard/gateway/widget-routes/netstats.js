@@ -1,9 +1,14 @@
 import { execFile } from "node:child_process";
 import { Router } from "express";
 import { CONFIG, hostIsAllowed } from "../platform/config.js";
-import { sendError, sendOk } from "../platform/responses.js";
+import { errorMessage, sendError, sendOk } from "../platform/responses.js";
 
 const router = Router();
+const BITS_PER_MEGABIT = 1_000_000;
+const FPING_SAMPLE_COUNT = 3;
+const MAX_PING_SAMPLE_MS = 200;
+const PUBLIC_IP_API_URL = "https://api.ipify.org?format=json";
+const SPEEDTEST_TIMEOUT_MS = 180_000;
 
 function allowedPingTarget(raw) {
   const value = String(raw || "").trim();
@@ -15,74 +20,78 @@ function allowedPingTarget(raw) {
 
 function pingOnce(target) {
   return new Promise((resolve, reject) => {
-    execFile("fping", ["-C", "3", "-q", target], (err, stdout, stderr) => {
-      const output = (stderr || stdout || "").trim();
+    execFile(
+      "fping",
+      ["-C", String(FPING_SAMPLE_COUNT), "-q", target],
+      (error, stdout, stderr) => {
+        const output = (stderr || stdout || "").trim();
 
-      if (err && !output) {
-        reject(err);
-        return;
+        if (error && !output) {
+          reject(error);
+          return;
+        }
+
+        const parts = output.split(":");
+        if (parts.length < 2) {
+          resolve(null);
+          return;
+        }
+
+        const samples = parts[1]
+          .trim()
+          .split(/\s+/)
+          .filter((value) => value !== "-" && value !== "")
+          .map((value) => Number.parseFloat(value))
+          .filter((value) => Number.isFinite(value) && value <= MAX_PING_SAMPLE_MS)
+          .sort((a, b) => a - b);
+
+        if (!samples.length) {
+          resolve(null);
+          return;
+        }
+
+        const midpoint = Math.floor(samples.length / 2);
+        const median = samples.length % 2 === 0
+          ? (samples[midpoint - 1] + samples[midpoint]) / 2
+          : samples[midpoint];
+
+        resolve(median);
       }
-
-      const parts = output.split(":");
-      if (parts.length < 2) {
-        resolve(null);
-        return;
-      }
-
-      const samples = parts[1]
-        .trim()
-        .split(/\s+/)
-        .filter((value) => value !== "-" && value !== "")
-        .map((value) => Number.parseFloat(value))
-        .filter((value) => Number.isFinite(value) && value <= 200)
-        .sort((a, b) => a - b);
-
-      if (!samples.length) {
-        resolve(null);
-        return;
-      }
-
-      const midpoint = Math.floor(samples.length / 2);
-      const median = samples.length % 2 === 0
-        ? (samples[midpoint - 1] + samples[midpoint]) / 2
-        : samples[midpoint];
-
-      resolve(median);
-    });
+    );
   });
 }
 
 function runSpeedtestCli() {
   return new Promise((resolve, reject) => {
-    execFile("speedtest-cli", ["--json"], { timeout: 180_000 }, (err, stdout, stderr) => {
-      if (err) {
-        reject(new Error(`speedtest-cli failed: ${err.message || err}\n${stderr || ""}`));
-        return;
-      }
+    execFile(
+      "speedtest-cli",
+      ["--json"],
+      { timeout: SPEEDTEST_TIMEOUT_MS },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(`speedtest-cli failed: ${errorMessage(error)}\n${stderr || ""}`));
+          return;
+        }
 
-      try {
-        resolve(JSON.parse(stdout));
-      } catch (parseError) {
-        reject(new Error(`Failed to parse speedtest-cli JSON: ${parseError}`));
+        try {
+          resolve(JSON.parse(stdout));
+        } catch (parseError) {
+          reject(new Error(`Failed to parse speedtest-cli JSON: ${parseError}`));
+        }
       }
-    });
+    );
   });
-}
-
-async function fetchJson(url, timeoutMs = CONFIG.upstreamTimeoutMs) {
-  const response = await fetch(url, {
-    headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(timeoutMs)
-  });
-  const json = await response.json().catch(() => ({}));
-  return { response, json };
 }
 
 let speedtestRunning = false;
 
 router.get("/net/myip", async (_req, res) => {
   try {
-    const { response, json } = await fetchJson("https://api.ipify.org?format=json");
+    const response = await fetch(PUBLIC_IP_API_URL, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(CONFIG.upstreamTimeoutMs)
+    });
+    const json = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       return sendError(res, 502, "upstream_error", "Public IP lookup failed.", {
@@ -91,9 +100,9 @@ router.get("/net/myip", async (_req, res) => {
     }
 
     return sendOk(res, { ip: json.ip || null });
-  } catch (err) {
+  } catch (error) {
     return sendError(res, 502, "upstream_unreachable", "Public IP lookup was unreachable.", {
-      error: String(err?.message || err)
+      error: errorMessage(error)
     });
   }
 });
@@ -110,8 +119,8 @@ router.get("/net/ping", async (req, res) => {
   try {
     const ms = await pingOnce(target);
     return sendOk(res, { target, ms });
-  } catch (err) {
-    return sendError(res, 500, "upstream_error", String(err?.message || err));
+  } catch (error) {
+    return sendError(res, 500, "upstream_error", errorMessage(error));
   }
 });
 
@@ -125,12 +134,12 @@ router.get("/net/speedtest", async (_req, res) => {
     const raw = await runSpeedtestCli();
     return sendOk(res, {
       ping_ms: raw.ping,
-      download_mbps: raw.download / 1e6,
-      upload_mbps: raw.upload / 1e6,
+      download_mbps: raw.download / BITS_PER_MEGABIT,
+      upload_mbps: raw.upload / BITS_PER_MEGABIT,
       raw
     });
-  } catch (err) {
-    return sendError(res, 500, "upstream_error", String(err?.message || err));
+  } catch (error) {
+    return sendError(res, 500, "upstream_error", errorMessage(error));
   } finally {
     speedtestRunning = false;
   }
