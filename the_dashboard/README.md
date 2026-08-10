@@ -56,6 +56,7 @@ config editor continues to read and save the active configuration.
 Important environment knobs are documented in `.env.example`, including:
 
 - `DASHBOARD_HTTP_PORT`
+- `DASHBOARD_CONFIG_PATH`
 - `GATEWAY_UPSTREAM_TIMEOUT_MS`
 - `HOME_ASSISTANT_BASE_URL`
 - `HOME_ASSISTANT_TOKEN`
@@ -124,6 +125,7 @@ Current Gateway routes include:
 - `GET /api/config`
 - `PUT /api/config`
 - `GET /api/calendar/events`
+- `GET /api/metar`
 - `GET /api/net/myip`
 - `GET /api/net/ping`
 - `GET /api/net/speedtest`
@@ -209,11 +211,15 @@ node tests/smoke.mjs
 node tests/verify-container-proxy.mjs
 ```
 
+The smoke script saves the currently active config source through the editor
+API to verify the complete write path. The contents are unchanged, but file
+metadata may be updated.
+
 ## Deferred Widget Work
 
 Remaining widget work is feature-specific:
 
-- Tune the live widget list and layout in `dashboard/config.js` as office needs
-  evolve.
+- Tune the live widget list and layout in the selected local config as office
+  needs evolve.
 - Add focused tests for widget-specific data parsing as each widget becomes more
   important.

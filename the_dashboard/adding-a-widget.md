@@ -18,7 +18,7 @@ part of adding the widget.
 | Path | When a widget change may touch it |
 | --- | --- |
 | `dashboard/widgets/<type>.js` | Always. This owns the widget's rendering and domain behavior. |
-| `dashboard/config.js` | To enable or demonstrate the widget with non-secret runtime configuration. |
+| `dashboard/config.js`, `dashboard/config.local.js` | Use the tracked file for a sanitized demonstration and the ignored local file for live runtime values. |
 | `gateway/widget-routes/<type>.js` | When the widget needs secrets, an upstream proxy, host access, command execution, or server-side aggregation. |
 | `gateway/gateway.js` | Only to import and mount a new companion router under `/api`. |
 | `tests/` | To cover domain parsing, lifecycle behavior, validation, and any Gateway contract added by the widget. |
@@ -181,7 +181,8 @@ should return focus to a stable trigger or input after rendering.
 
 ## Configuration Contract
 
-Enable the widget in `dashboard/config.js`:
+Enable the widget in the selected dashboard config. Use
+`dashboard/config.local.js` for a live local instance:
 
 ```js
 {
@@ -205,8 +206,9 @@ Enable the widget in `dashboard/config.js`:
 - `props` is an optional object owned by the widget. Use names consistent with
   existing shared layout props such as `tile_minWidth`, `tile_columns`, and
   `tile_gap`.
-- Put only live, non-secret display configuration in `config.js`. Secrets and
-  infrastructure settings belong in Gateway environment variables.
+- Put live, non-secret display configuration in the ignored local config. Keep
+  the tracked default sanitized; secrets and infrastructure settings belong in
+  Gateway environment variables.
 
 ## Styling and DOM Rules
 
@@ -220,10 +222,9 @@ Enable the widget in `dashboard/config.js`:
   `--tile-box-shadow`. Keep data layout, field grouping, and domain-state
   effects in the widget.
 - Use `label`, `label-info`, and `value-large` for the established type scale.
-- Widget-specific CSS may be injected by the widget with an idempotent
-  `ensureStyles()` function and a unique style element ID. Scope selectors with
-  a widget-specific class and keep only the rules that cannot be expressed by
-  global primitives.
+- Install genuinely widget-specific CSS with `installWidgetStyles()`, a unique
+  style element ID, and widget-scoped selectors. Keep only rules that cannot be
+  expressed by global primitives.
 - Move a widget-specific class to `global.css` when another widget needs the
   same visual concept; update both consumers rather than copying the rule.
 - Build user- or upstream-controlled content with DOM nodes and `textContent`.
@@ -342,9 +343,9 @@ general precedents for new widgets.
 | --- | --- | --- |
 | `clocks` | Owns a one-second interval while `refreshMs` is `0`. | The shell cadence is not suitable for a ticking clock. Initialize the timer once per instance and keep clock typography on the shared `value-large` scale. |
 | `netstats` | Owns separate IP and latency timers while `refreshMs` is `0`. | Independent cadences justify the timers. Each operation has a per-instance in-flight guard, visible stale/recovery state, and no shared mutable polling state. |
-| `countdown` | Keeps specialized progress bars, popup placement, and today/overdue severity glows. | These are domain presentation, while the surface padding and shadow flow through the shared tile customization properties. |
+| `calendar` | Keeps its calendar grid plus specialized countdown progress, popup placement, and today/overdue severity glows. | These are domain presentation, while the surface padding and shadow flow through the shared tile customization properties. |
 
 `status`, `netstats`, `metar`, and `todos` all keep their backend companions in
-`gateway/widget-routes/`. `text` is intentionally static. Search and todos use
-the shared dismissible-menu controller rather than persistent document
-listeners.
+`gateway/widget-routes/`. `text` is intentionally static. Search, todos, and
+time-since use the shared dismissible-menu controller rather than persistent
+document listeners.
