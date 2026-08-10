@@ -3,6 +3,7 @@ import {
   createTile,
   createWidgetMessage,
   fetchJson,
+  installWidgetStyles,
   setStateMessage
 } from "../platform/global.js";
 import {
@@ -25,19 +26,14 @@ const SEARCH_DAYS = 366;
 const MAX_FEED_URL_LENGTH = 2048;
 const WEEKDAY_LABELS = Object.freeze(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
 
-function ensureCalendarStyles() {
-  if (document.getElementById(CALENDAR_STYLE_ID)) return;
-
-  const style = document.createElement("style");
-  style.id = CALENDAR_STYLE_ID;
-  style.textContent = `
+const CALENDAR_STYLES = `
     .calendar-widget {
-      --calendar-cell-gap: 4px;
+      --calendar-cell-gap: var(--space-xs);
       --calendar-cell-height: 34px;
-      --tile-padding: 14px;
+      --tile-padding: var(--space-comfortable);
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: var(--gap);
     }
 
     .calendar-heading {
@@ -59,7 +55,7 @@ function ensureCalendarStyles() {
       font-size: 11px;
       font-weight: 600;
       line-height: 1;
-      padding: 2px 0;
+      padding: var(--space-hairline) 0;
       text-align: center;
     }
 
@@ -74,11 +70,11 @@ function ensureCalendarStyles() {
       display: flex;
       flex-direction: column;
       font: inherit;
-      gap: 2px;
+      gap: var(--space-hairline);
       height: var(--calendar-cell-height);
       justify-content: center;
       min-width: 0;
-      padding: 2px;
+      padding: var(--space-hairline);
     }
 
     .calendar-day:hover {
@@ -133,7 +129,7 @@ function ensureCalendarStyles() {
     .calendar-lower {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: var(--space-control);
       min-width: 0;
     }
 
@@ -175,8 +171,8 @@ function ensureCalendarStyles() {
     .calendar-event {
       display: flex;
       flex-direction: column;
-      gap: 2px;
-      padding: 5px 2px;
+      gap: var(--space-hairline);
+      padding: 5px var(--space-hairline);
     }
 
     .calendar-event-title {
@@ -191,15 +187,11 @@ function ensureCalendarStyles() {
       text-align: center;
     }
 
-    .calendar-refresh-warning:empty {
-      display: none;
-    }
-
     @media (max-width: 420px) {
       .calendar-widget {
-        --calendar-cell-gap: 2px;
+        --calendar-cell-gap: var(--space-hairline);
         --calendar-cell-height: 30px;
-        --tile-padding: 10px;
+        --tile-padding: var(--space-control);
       }
 
       .calendar-day-number {
@@ -209,8 +201,6 @@ function ensureCalendarStyles() {
       }
     }
   `;
-  document.head.appendChild(style);
-}
 
 function normalizeFeedUrl(value) {
   const source = typeof value === "string" ? value.trim() : "";
@@ -260,9 +250,6 @@ function createCountdownBar(label, targetDate = null) {
     overdueFill.style.width = `${countdown.overduePercent}%`;
     bar.classList.toggle("calendar-countdown--today", countdown.mode === "today");
     bar.classList.toggle("calendar-countdown--overdue", countdown.mode === "overdue");
-  } else {
-    futureFill.style.width = "0%";
-    overdueFill.style.width = "0%";
   }
 
   bottom.appendChild(track);
@@ -358,7 +345,7 @@ function calendarRequestUrl(state, now) {
 
 window.DASH.registerWidget("calendar", {
   mount(root, { props = {} }) {
-    ensureCalendarStyles();
+    installWidgetStyles(CALENDAR_STYLE_ID, CALENDAR_STYLES);
 
     const now = new Date();
     const tile = createTile("calendar-widget");
@@ -371,16 +358,15 @@ window.DASH.registerWidget("calendar", {
     const dayButtons = Array.from({ length: CALENDAR_GRID_DAYS }, createDayButton);
     dayButtons.forEach(({ button }) => daysGrid.appendChild(button));
     const lower = createElement("div", "calendar-lower");
-    const warning = createElement("div", "calendar-refresh-warning muted");
+    const warning = createElement(
+      "div",
+      "calendar-refresh-warning muted widget-status"
+    );
     tile.append(heading, weekdays, daysGrid, lower, warning);
     root.replaceChildren(tile);
 
     const state = {
-      root,
-      tile,
       heading,
-      weekdays,
-      daysGrid,
       dayButtons,
       lower,
       warning,

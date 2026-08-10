@@ -7,11 +7,18 @@ const CHIP_MAX_PERCENT = 95;
 const SUNDAY = 0;
 const MONDAY = 1;
 const THURSDAY = 4;
-const FRIDAY = 5;
 const SATURDAY = 6;
 
 function padDatePart(value) {
   return String(value).padStart(2, "0");
+}
+
+function isValidDate(date) {
+  return Number.isFinite(date.getTime());
+}
+
+function localDayOrdinal(date) {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 export function localDateKey(date) {
@@ -30,7 +37,7 @@ export function parseLocalDateKey(dateKey) {
   return localDateKey(date) === dateKey ? date : null;
 }
 
-export function startOfLocalDay(date) {
+function startOfLocalDay(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
@@ -41,16 +48,8 @@ export function addLocalDays(date, days) {
 }
 
 export function calendarDayDifference(target, reference) {
-  const targetDay = Date.UTC(
-    target.getFullYear(),
-    target.getMonth(),
-    target.getDate()
-  );
-  const referenceDay = Date.UTC(
-    reference.getFullYear(),
-    reference.getMonth(),
-    reference.getDate()
-  );
+  const targetDay = localDayOrdinal(target);
+  const referenceDay = localDayOrdinal(reference);
   return Math.round((targetDay - referenceDay) / MILLISECONDS_PER_DAY);
 }
 
@@ -147,7 +146,7 @@ export function nextFederalHoliday(now = new Date()) {
     .sort((left, right) => left.date - right.date)[0];
 }
 
-export function eventOccupiesDate(event, dateKey) {
+function eventOccupiesDate(event, dateKey) {
   const dayStart = parseLocalDateKey(dateKey);
   if (!dayStart) return false;
 
@@ -161,8 +160,8 @@ export function eventOccupiesDate(event, dateKey) {
   const eventStart = new Date(event?.start);
   const eventEnd = new Date(event?.end);
   if (
-    !Number.isFinite(eventStart.getTime())
-    || !Number.isFinite(eventEnd.getTime())
+    !isValidDate(eventStart)
+    || !isValidDate(eventEnd)
     || eventEnd <= eventStart
   ) {
     return false;
@@ -202,8 +201,8 @@ function upcomingEventCandidate(event, now, originalIndex) {
     const start = new Date(event?.start);
     const end = new Date(event?.end);
     if (
-      !Number.isFinite(start.getTime())
-      || !Number.isFinite(end.getTime())
+      !isValidDate(start)
+      || !isValidDate(end)
       || end <= now
       || end <= start
     ) {
@@ -221,9 +220,7 @@ function upcomingEventCandidate(event, now, originalIndex) {
     originalIndex,
     sortStart,
     targetDate,
-    feedOrder: Number.isFinite(event.feedOrder)
-      ? event.feedOrder
-      : Number.MAX_SAFE_INTEGER
+    feedOrder: eventFeedOrder(event)
   };
 }
 
@@ -287,8 +284,8 @@ export function formatEventTimeRange(event, dateKey) {
   const eventEnd = new Date(event?.end);
   if (
     !dayStart
-    || !Number.isFinite(eventStart.getTime())
-    || !Number.isFinite(eventEnd.getTime())
+    || !isValidDate(eventStart)
+    || !isValidDate(eventEnd)
   ) {
     return "";
   }
