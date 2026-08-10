@@ -1,8 +1,9 @@
 import { validateDashboardConfig } from "./config-validator.mjs";
 
-// Global registry (widgets do: window.DASH.registerWidget(...))
 const REGISTRY = new Map();
-function registerWidget(type, impl){ REGISTRY.set(type, impl); }
+function registerWidget(type, implementation) {
+  REGISTRY.set(type, implementation);
+}
 window.DASH = Object.freeze({ registerWidget });
 
 function renderMessage(grid, { title, lines = [], className = "" }) {
@@ -39,72 +40,60 @@ function renderWidgetError(element, message) {
   element.append(heading, detail);
 }
 
-// Dynamic import of ../widgets/<type>.js
 async function ensureWidgetTypeLoaded(type) {
-  if (REGISTRY.has(type))
-    // already loaded
-    return;
+  if (REGISTRY.has(type)) return;
 
-  if (!/^[a-z0-9_-]+$/i.test(type))
-    // filter characters
-    throw new Error(`Invalid widget type: ${type}`);
-  
-  // looks valid; load
+  // Configuration validation constrains type to a safe import-path identifier.
   await import(`../widgets/${type}.js`);
 }
 
-// Grid helpers (JS sets CSS variables; CSS @media can override)
-function applyGrid(gridElement, opts) {
-  const config_grid = opts?.grid ?? {};
+function applyGrid(gridElement, options) {
+  const gridOptions = options?.grid ?? {};
 
-  // grid gap requested?
-  if (Number.isFinite(config_grid.gap))
-    gridElement.style.setProperty('--grid-gap', `${config_grid.gap}px`);
+  if (Number.isFinite(gridOptions.gap))
+    gridElement.style.setProperty("--grid-gap", `${gridOptions.gap}px`);
  
-  // grid min column width requested?
-  if (Number.isFinite(config_grid.minColWidth))
-    gridElement.style.setProperty('--grid-min-col', `${config_grid.minColWidth}px`);
+  if (Number.isFinite(gridOptions.minColWidth))
+    gridElement.style.setProperty("--grid-min-col", `${gridOptions.minColWidth}px`);
 
-  // grid overall width requested?
-  if (config_grid.width)
-    gridElement.style.setProperty('--grid-width', config_grid.width);
+  if (gridOptions.width)
+    gridElement.style.setProperty("--grid-width", gridOptions.width);
 
-  // grid number of columns requested?
-  const cols = config_grid.columns ?? "auto";
-  const template = (cols === "auto")
+  const columns = gridOptions.columns ?? "auto";
+  const template = columns === "auto"
     ? `repeat(auto-fill, minmax(var(--grid-min-col), 1fr))`
-    : `repeat(${Math.max(1, +cols || 1)}, 1fr)`;
-  gridElement.style.setProperty('--grid-columns', template);
+    : `repeat(${Math.max(1, Number(columns) || 1)}, 1fr)`;
+  gridElement.style.setProperty("--grid-columns", template);
 }
 
-// clamp requestedAmt < total; special case "all"
 function clampOrAll(requested, total) {
-  return requested === "all" ? total : Math.min(Math.max(1, +requested||1), total);
+  return requested === "all"
+    ? total
+    : Math.min(Math.max(1, Number(requested) || 1), total);
 }
 
-// helper on load: create a minimal shell with a skeleton placeholder
-function skeletonShell({ id }){
-  const element = document.createElement('section');
-  element.className = 'widget';
+function createSkeletonShell({ id }) {
+  const element = document.createElement("section");
+  element.className = "widget";
   element.id = `w-${id}`;
-  const content = document.createElement('div');
-  content.className = 'content--pending';
-  const skel = document.createElement('div');
-  skel.className = 'skeleton';
-  skel.innerHTML = `
+  const content = document.createElement("div");
+  content.className = "content--pending";
+  const skeleton = document.createElement("div");
+  skeleton.className = "skeleton";
+  skeleton.innerHTML = `
     <div class="skeleton-row skeleton-wide"></div>
     <div class="skeleton-row"></div>
     <div class="skeleton-row"></div>
   `;
-  content.appendChild(skel);
+  content.appendChild(skeleton);
   element.appendChild(content);
-  return { element };
+  return element;
 }
 
-async function start(){
-  const grid = document.getElementById('grid');
-  const cfg = window.DASH_CONFIG || { widgets: [] };
-  const validation = validateDashboardConfig(cfg);
+async function startDashboard() {
+  const grid = document.getElementById("grid");
+  const config = window.DASH_CONFIG || { widgets: [] };
+  const validation = validateDashboardConfig(config);
 
   if (!validation.ok) {
     renderMessage(grid, {
@@ -115,25 +104,25 @@ async function start(){
     return;
   }
 
-  // apply config requested grid options to css
-  applyGrid(grid, cfg.options);
-  // check against actual css as to what we're using
-  const cssCols = getComputedStyle(grid).gridTemplateColumns || "";
-  // clamp
-  let totalCols = Math.max(1, cssCols.split(/\s+(?![^()]*\))/).filter(Boolean).length);
+  applyGrid(grid, config.options);
+  // CSS media queries can override the configured grid before spans are clamped.
+  const renderedColumns = getComputedStyle(grid).gridTemplateColumns || "";
+  const totalCols = Math.max(
+    1,
+    renderedColumns.split(/\s+(?![^()]*\))/).filter(Boolean).length
+  );
 
-  // create skeletons immediately
   const mounted = [];
-  for (const widg of cfg.widgets){
-    const { element } = skeletonShell(widg);
+  for (const widgetConfig of config.widgets) {
+    const element = createSkeletonShell(widgetConfig);
 
-    // have skeletons mirror actual config layout
-    const requested_width = (widg.width === 'all') ? 'all' : String(widg.width ?? '1');
-    element.dataset.requestedSpan = requested_width;
-    element.style.gridColumn = `span ${clampOrAll(requested_width, totalCols)}`;
+    const requestedWidth = widgetConfig.width === "all"
+      ? "all"
+      : String(widgetConfig.width ?? "1");
+    element.style.gridColumn = `span ${clampOrAll(requestedWidth, totalCols)}`;
     grid.appendChild(element);
 
-    mounted.push({ widg, element });
+    mounted.push({ widgetConfig, element });
   }
 
   if (mounted.length === 0) {
@@ -144,49 +133,49 @@ async function start(){
     return;
   }
 
-  for (const { widg, element } of mounted){
+  for (const { widgetConfig, element } of mounted) {
     try {
-      await ensureWidgetTypeLoaded(widg.type);
-    } catch (e) {
-      renderWidgetError(element, `Failed to load type "${widg.type}": ${String(e?.message || e)}`);
+      await ensureWidgetTypeLoaded(widgetConfig.type);
+    } catch (error) {
+      renderWidgetError(
+        element,
+        `Failed to load type "${widgetConfig.type}": ${String(error?.message || error)}`
+      );
       continue;
     }
 
-    const impl = REGISTRY.get(widg.type);
-    if (!impl) {
-      renderWidgetError(element, `Missing widget type: ${widg.type}`);
+    const implementation = REGISTRY.get(widgetConfig.type);
+    if (!implementation) {
+      renderWidgetError(element, `Missing widget type: ${widgetConfig.type}`);
       continue;
     }
-  
+
     let instance;
-    // try to mount into the same content node (widget decides if it needs to keep the skeleton for a minute)
     try {
-      instance = impl.mount(element, {
-        id: widg.id,
-        type: widg.type,
-        props: widg.props
+      instance = implementation.mount(element, {
+        id: widgetConfig.id,
+        type: widgetConfig.type,
+        props: widgetConfig.props
       });
-    } catch (e) {
-      renderWidgetError(element, `Mount failed: ${String(e?.message || e)}`);
+    } catch (error) {
+      renderWidgetError(element, `Mount failed: ${String(error?.message || error)}`);
       continue;
     }
 
-    if (typeof impl.update === "function") {
+    if (typeof implementation.update === "function") {
       const refresh = async () => {
         try {
-          await impl.update(instance);
-        } catch (e) {
-          renderWidgetError(element, `Update failed: ${String(e?.message || e)}`);
+          await implementation.update(instance);
+        } catch (error) {
+          renderWidgetError(element, `Update failed: ${String(error?.message || error)}`);
         }
       };
       await refresh();
 
-      // update refresh interval if set
-      if (widg.refreshMs > 0)
-        setInterval(refresh, widg.refreshMs);
+      if (widgetConfig.refreshMs > 0)
+        setInterval(refresh, widgetConfig.refreshMs);
     }
   }
 }
 
-// add entry point
-window.addEventListener('DOMContentLoaded', start);
+window.addEventListener("DOMContentLoaded", startDashboard);
