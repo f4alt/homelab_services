@@ -1,16 +1,18 @@
-import { createStack, createTile, fetchJson, setStateMessage } from "../platform/global.js";
+import {
+  createStack,
+  createTile,
+  fetchJson,
+  installWidgetStyles,
+  setStateMessage
+} from "../platform/global.js";
 import { formatMetarEntry, metarGatewayFailure } from "./metar-domain.js";
 
-(function () {
-  function ensureStyles() {
-    if (document.getElementById("metar-widget-styles")) return;
-    const s = document.createElement("style");
-    s.id = "metar-widget-styles";
-    s.textContent = `
+const METAR_STYLE_ID = "metar-widget-styles";
+const METAR_STYLES = `
     .metar-tile {
       align-items: center;
       display: grid;
-      gap: 6px 10px;
+      gap: var(--space-compact) var(--space-control);
       grid-template-columns:
         minmax(5ch, .55fr)
         minmax(7ch, .7fr)
@@ -48,145 +50,127 @@ import { formatMetarEntry, metarGatewayFailure } from "./metar-domain.js";
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
-    `;
-    document.head.appendChild(s);
-  }
+  `;
 
-  function createMetarTile(stationId) {
-    const tile = createTile("metar-tile");
+function createMetarTile(stationId) {
+  const tile = createTile("metar-tile");
 
-    // Kxxx
-    const station = document.createElement("div");
-    station.className = "label metar-field metar-station";
-    station.textContent = stationId;
+  const station = document.createElement("div");
+  station.className = "label metar-field metar-station";
+  station.textContent = stationId;
 
-    // ddhhmmZ
-    const timestampSpan = document.createElement("span");
-    timestampSpan.className = "label-info metar-field metar-time";
+  const timestampSpan = document.createElement("span");
+  timestampSpan.className = "label-info metar-field metar-time";
 
-    // 123@45KT
-    const windSpan = document.createElement("span");
-    windSpan.className = "label-info metar-field metar-wind";
+  const windSpan = document.createElement("span");
+  windSpan.className = "label-info metar-field metar-wind";
 
-    // 10+SM
-    const visSpan = document.createElement("span");
-    visSpan.className = "label-info metar-field metar-visibility";
+  const visSpan = document.createElement("span");
+  visSpan.className = "label-info metar-field metar-visibility";
 
-    // (optional) RA | HZ
-    const wxSpan = document.createElement("span");
-    wxSpan.className = "label-info metar-field metar-weather";
+  const wxSpan = document.createElement("span");
+  wxSpan.className = "label-info metar-field metar-weather";
 
-    // SCR123 FEW456
-    const skySpan = document.createElement("span");
-    skySpan.className = "label-info metar-field metar-sky";
+  const skySpan = document.createElement("span");
+  skySpan.className = "label-info metar-field metar-sky";
 
-    // 12°C
-    const tempSpan = document.createElement("span");
-    tempSpan.className = "label-info metar-field metar-temperature";
+  const tempSpan = document.createElement("span");
+  tempSpan.className = "label-info metar-field metar-temperature";
 
-    // A2992
-    const altSpan = document.createElement("span");
-    altSpan.className = "label-info metar-field metar-altimeter";
+  const altSpan = document.createElement("span");
+  altSpan.className = "label-info metar-field metar-altimeter";
 
-    // RMK blah
-    const remarksSpan = document.createElement("span");
-    remarksSpan.className = "label-info metar-field metar-remarks";
+  const remarksSpan = document.createElement("span");
+  remarksSpan.className = "label-info metar-field metar-remarks";
 
-    tile.appendChild(station);
-    tile.appendChild(timestampSpan);
-    tile.appendChild(windSpan);
-    tile.appendChild(visSpan);
-    tile.appendChild(wxSpan);
-    tile.appendChild(skySpan);
-    tile.appendChild(tempSpan);
-    tile.appendChild(altSpan);
-    tile.appendChild(remarksSpan);
+  tile.append(
+    station,
+    timestampSpan,
+    windSpan,
+    visSpan,
+    wxSpan,
+    skySpan,
+    tempSpan,
+    altSpan,
+    remarksSpan
+  );
 
-    return {
-      tile,
-      station,
-      timestampSpan,
-      windSpan,
-      visSpan,
-      wxSpan,
-      skySpan,
-      tempSpan,
-      altSpan,
-      remarksSpan
-    };
-  }
+  return {
+    tile,
+    station,
+    timestampSpan,
+    windSpan,
+    visSpan,
+    wxSpan,
+    skySpan,
+    tempSpan,
+    altSpan,
+    remarksSpan
+  };
+}
 
-  function populateMetarTile(dom, data) {
-    dom.tile.classList.toggle("error", data.state === "error");
-    dom.tile.classList.toggle("metar-no-data", data.state === "no-data");
+function populateMetarTile(elements, data) {
+  elements.tile.classList.toggle("error", data.state === "error");
 
-    // fill data into spans
-    dom.station.textContent       = data.station   || "????";
-    dom.timestampSpan.textContent = data.timestamp || "";
-    dom.windSpan.textContent      = data.wind      || "";
-    dom.visSpan.textContent       = data.vis       || "";
-    dom.wxSpan.textContent        = data.wx        || "";
-    dom.skySpan.textContent       = data.sky       || "";
-    dom.tempSpan.textContent      = data.temp      || "";
-    dom.altSpan.textContent       = data.alt       || "";
-    dom.remarksSpan.textContent   = data.remarks   || "";
-  }
+  elements.station.textContent = data.station || "????";
+  elements.timestampSpan.textContent = data.timestamp || "";
+  elements.windSpan.textContent = data.wind || "";
+  elements.visSpan.textContent = data.vis || "";
+  elements.wxSpan.textContent = data.wx || "";
+  elements.skySpan.textContent = data.sky || "";
+  elements.tempSpan.textContent = data.temp || "";
+  elements.altSpan.textContent = data.alt || "";
+  elements.remarksSpan.textContent = data.remarks || "";
+}
 
-  async function fetchMetars(stations) {
-    if (!stations || !stations.length)
-      return {};
+async function fetchMetars(stations) {
+  if (!stations || !stations.length) return {};
 
-    const url = `/metar?stations=${encodeURIComponent(stations.join(","))}`;
+  const url = `/metar?stations=${encodeURIComponent(stations.join(","))}`;
 
-    const data = await fetchJson(url);
-    return data?.stations || {};
-  }
+  const data = await fetchJson(url);
+  return data?.stations || {};
+}
 
-  window.DASH.registerWidget("metar", {
-    mount(root, { props = {} }) {
-      ensureStyles();
+window.DASH.registerWidget("metar", {
+  mount(root, { props = {} }) {
+    installWidgetStyles(METAR_STYLE_ID, METAR_STYLES);
 
-      const stations = Array.isArray(props?.stations)
-        ? props.stations.map(s => String(s).trim().toUpperCase()).filter(Boolean)
-        : [];
+    const stations = Array.isArray(props?.stations)
+      ? props.stations.map((station) => String(station).trim().toUpperCase()).filter(Boolean)
+      : [];
 
-      const grid = createStack();
-      root.replaceChildren(grid);
-      if (!stations.length) {
-        setStateMessage(grid, "No METAR stations configured.", "empty");
-        return { root, grid, stations, rows: {} };
+    const grid = createStack();
+    root.replaceChildren(grid);
+    if (!stations.length) {
+      setStateMessage(grid, "No METAR stations configured.", "empty");
+      return { stations, rows: {} };
+    }
+
+    const rows = {};
+    stations.forEach((station) => {
+      const elements = createMetarTile(station);
+      rows[station] = elements;
+      grid.appendChild(elements.tile);
+    });
+
+    return { stations, rows };
+  },
+
+  async update(instance) {
+    try {
+      const dataByStation = await fetchMetars(instance.stations);
+      for (const station of instance.stations) {
+        const elements = instance.rows[station];
+        if (!elements) continue;
+        populateMetarTile(elements, formatMetarEntry(dataByStation[station], station));
       }
-
-      const rows = {};
-      stations.forEach((stn) => {
-        const dom = createMetarTile(stn);
-        rows[stn] = dom;
-        grid.appendChild(dom.tile);
-      });
-
-      return {
-        root,
-        grid,
-        stations,
-        rows
-      };
-    },
-
-    async update(instance) {
-      try {
-        const dataByStation = await fetchMetars(instance.stations);
-        for (const stn of instance.stations) {
-          const dom = instance.rows[stn];
-          if (!dom) continue;
-          populateMetarTile(dom, formatMetarEntry(dataByStation[stn], stn));
-        }
-      } catch (error) {
-        for (const stn of instance.stations) {
-          const dom = instance.rows[stn];
-          if (!dom) continue;
-          populateMetarTile(dom, metarGatewayFailure(stn, error));
-        }
+    } catch (error) {
+      for (const station of instance.stations) {
+        const elements = instance.rows[station];
+        if (!elements) continue;
+        populateMetarTile(elements, metarGatewayFailure(station, error));
       }
     }
-  });
-})();
+  }
+});

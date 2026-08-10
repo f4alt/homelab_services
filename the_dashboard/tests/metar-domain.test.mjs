@@ -41,8 +41,7 @@ test("METAR preserves structured wind while parsing the remaining raw observatio
     temp: "30/20",
     alt: "A3000",
     remarks: "",
-    state: "observation",
-    isError: false
+    state: "observation"
   });
 });
 
@@ -70,7 +69,6 @@ test("METAR no-data records retain the requested or Gateway station identity", (
   assert.equal(gatewayNoData.timestamp, "N/A");
   assert.equal(gatewayNoData.remarks, "no recent data");
   assert.equal(gatewayNoData.state, "no-data");
-  assert.equal(gatewayNoData.isError, false);
   assert.equal(missingStation.station, "KAFW");
   assert.equal(missingStation.remarks, "no data");
   assert.equal(missingStation.state, "no-data");
@@ -84,7 +82,5 @@ test("METAR Gateway failures are distinct from valid no-data observations", () =
   assert.equal(failure.timestamp, "ERR");
   assert.equal(failure.remarks, "Gateway unavailable: Gateway offline");
   assert.equal(failure.state, "error");
-  assert.equal(failure.isError, true);
   assert.equal(noData.state, "no-data");
-  assert.equal(noData.isError, false);
 });

@@ -1,3 +1,5 @@
+const INCHES_MERCURY_PER_HECTOPASCAL = 0.0295299830714;
+
 function hasValue(value) {
   return value !== undefined && value !== null && String(value).trim() !== "";
 }
@@ -27,7 +29,9 @@ function formatRawWind(token) {
 
 function formatAltimeter(hectoPascals) {
   if (!hasValue(hectoPascals) || !Number.isFinite(Number(hectoPascals))) return "";
-  const hundredths = Math.round(Number(hectoPascals) * 0.0295299830714 * 100);
+  const hundredths = Math.round(
+    Number(hectoPascals) * INCHES_MERCURY_PER_HECTOPASCAL * 100
+  );
   return `A${String(hundredths).padStart(4, "0")}`;
 }
 
@@ -49,8 +53,7 @@ export function formatMetarEntry(entry, requestedStation = "") {
       temp: "",
       alt: "",
       remarks: String(entry?.error || "no data"),
-      state: "no-data",
-      isError: false
+      state: "no-data"
     };
   }
 
@@ -108,8 +111,7 @@ export function formatMetarEntry(entry, requestedStation = "") {
     temp: temperatureToken || structuredTemperature,
     alt: altimeterToken || formatAltimeter(entry.altim),
     remarks: remarks.trim(),
-    state: "observation",
-    isError: false
+    state: "observation"
   };
 }
 
@@ -125,7 +127,6 @@ export function metarGatewayFailure(requestedStation, error) {
     temp: "",
     alt: "",
     remarks: `Gateway unavailable: ${detail}`,
-    state: "error",
-    isError: true
+    state: "error"
   };
 }
