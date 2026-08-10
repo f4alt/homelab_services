@@ -1,3 +1,5 @@
+const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
+
 export function apiBase() {
   return (window.DASH_CONFIG?.apiBase ?? "").replace(/\/+$/, "");
 }
@@ -10,7 +12,7 @@ export function apiUrl(path) {
 
 export async function fetchJson(pathOrUrl, options = {}) {
   const {
-    timeoutMs = 8000,
+    timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
     envelope = true,
     fetchOptions = {}
   } = options;
@@ -64,6 +66,15 @@ export function createElement(tag, className, text) {
   if (className) element.className = className;
   if (text !== undefined) element.textContent = text;
   return element;
+}
+
+export function installWidgetStyles(styleId, cssText) {
+  if (document.getElementById(styleId)) return;
+
+  const style = createElement("style");
+  style.id = styleId;
+  style.textContent = cssText;
+  document.head.appendChild(style);
 }
 
 export function createWidgetMessage(message, className = "") {
