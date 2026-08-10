@@ -10,11 +10,7 @@ export function sendError(res, status, code, message, details = null) {
   return res.status(status).json({
     ok: false,
     data: null,
-    error: {
-      code,
-      message,
-      ...(details ? { details } : {})
-    }
+    error: errorPayload(code, message, details)
   });
 }
 
@@ -24,4 +20,8 @@ export function errorPayload(code, message, details = null) {
     message,
     ...(details ? { details } : {})
   };
+}
+
+export function errorMessage(error) {
+  return String(error?.message || error);
 }

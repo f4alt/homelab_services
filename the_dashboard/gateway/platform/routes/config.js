@@ -5,12 +5,13 @@ import vm from "node:vm";
 import { pathToFileURL } from "node:url";
 import { CONFIG } from "../config.js";
 import { writeConfigFile } from "../config-file.js";
-import { sendError, sendOk } from "../responses.js";
+import { errorMessage, sendError, sendOk } from "../responses.js";
 
 const router = express.Router();
 
 const CONFIG_PATH = path.resolve(CONFIG.dashboardConfigPath);
 const VALIDATOR_PATH = path.resolve(CONFIG.dashboardConfigValidatorPath);
+const CONFIG_EVALUATION_TIMEOUT_MS = 1000;
 const MAX_SOURCE_BYTES = 1024 * 1024;
 
 router.use(express.text({
@@ -18,13 +19,13 @@ router.use(express.text({
   limit: `${MAX_SOURCE_BYTES}b`
 }));
 
-function normalizeSource(req) {
-  if (typeof req.body?.source === "string") {
-    return req.body.source;
+function normalizeSource(body) {
+  if (typeof body?.source === "string") {
+    return body.source;
   }
 
-  if (typeof req.body === "string") {
-    return req.body;
+  if (typeof body === "string") {
+    return body;
   }
 
   return null;
@@ -52,12 +53,12 @@ async function validateSource(source) {
   try {
     vm.runInNewContext(source, sandbox, {
       filename: "dashboard/config.js",
-      timeout: 1000
+      timeout: CONFIG_EVALUATION_TIMEOUT_MS
     });
-  } catch (err) {
+  } catch (error) {
     return {
       ok: false,
-      errors: [`Config JavaScript failed to evaluate: ${String(err?.message || err)}`],
+      errors: [`Config JavaScript failed to evaluate: ${errorMessage(error)}`],
       warnings: []
     };
   }
@@ -76,21 +77,21 @@ router.get("/config", async (_req, res) => {
   try {
     const source = await fs.readFile(CONFIG_PATH, "utf8");
     return res.type("application/javascript").send(source);
-  } catch (err) {
+  } catch (error) {
     return sendError(res, 500, "config_read_failed", "Unable to read dashboard config.", {
-      error: String(err?.message || err)
+      error: errorMessage(error)
     });
   }
 });
 
 router.put("/config", async (req, res) => {
-  const source = normalizeSource(req);
+  const source = normalizeSource(req.body);
   let result;
   try {
     result = await validateSource(source);
-  } catch (err) {
+  } catch (error) {
     return sendError(res, 500, "validation_failed", "Unable to validate dashboard config.", {
-      error: String(err?.message || err)
+      error: errorMessage(error)
     });
   }
 
@@ -101,9 +102,9 @@ router.put("/config", async (req, res) => {
   try {
     await writeConfigFile(CONFIG_PATH, source);
     return sendOk(res, result);
-  } catch (err) {
+  } catch (error) {
     return sendError(res, 500, "config_write_failed", "Unable to write dashboard config.", {
-      error: String(err?.message || err)
+      error: errorMessage(error)
     });
   }
 });

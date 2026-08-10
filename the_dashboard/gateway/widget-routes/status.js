@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { CONFIG, hostIsAllowed } from "../platform/config.js";
-import { errorPayload, sendError, sendOk } from "../platform/responses.js";
+import {
+  errorMessage,
+  errorPayload,
+  sendError,
+  sendOk
+} from "../platform/responses.js";
 
 const router = Router();
-
-function allowedHost(hostname) {
-  return hostIsAllowed(hostname, CONFIG.statusProbe.allowedHosts);
-}
 
 function asUrl(raw, scheme) {
   const value = String(raw || "").trim();
@@ -42,7 +43,9 @@ function validateTarget(raw) {
     };
   }
 
-  const disallowed = candidates.find((url) => !allowedHost(url.hostname));
+  const disallowed = candidates.find((url) => (
+    !hostIsAllowed(url.hostname, CONFIG.statusProbe.allowedHosts)
+  ));
   if (disallowed) {
     return {
       ok: false,
@@ -54,14 +57,14 @@ function validateTarget(raw) {
 }
 
 async function tryFetch(url) {
-  const t0 = performance.now();
+  const startedAt = performance.now();
   const response = await fetch(url, {
     method: "GET",
     redirect: "manual",
     signal: AbortSignal.timeout(CONFIG.statusProbe.timeoutMs)
   });
-  const t1 = performance.now();
-  return { response, ms: Math.round(t1 - t0) };
+  const finishedAt = performance.now();
+  return { response, ms: Math.round(finishedAt - startedAt) };
 }
 
 async function probeOne(raw) {
@@ -101,7 +104,7 @@ async function probeOne(raw) {
   };
 }
 
-async function mapWithConcurrency(items, concurrency, fn) {
+async function mapWithConcurrency(items, concurrency, mapper) {
   const results = new Array(items.length);
   let nextIndex = 0;
 
@@ -109,7 +112,7 @@ async function mapWithConcurrency(items, concurrency, fn) {
     while (nextIndex < items.length) {
       const index = nextIndex;
       nextIndex += 1;
-      results[index] = await fn(items[index], index);
+      results[index] = await mapper(items[index], index);
     }
   }
 
@@ -141,16 +144,16 @@ router.post("/statuschecks", async (req, res) => {
     const results = await mapWithConcurrency(
       targets,
       CONFIG.statusProbe.concurrency,
-      async (target) => probeOne(String(target?.url || "").trim())
+      (target) => probeOne(String(target?.url || "").trim())
     );
 
     return sendOk(res, {
       count: results.length,
       results
     });
-  } catch (err) {
+  } catch (error) {
     return sendError(res, 500, "internal_error", "Status checks failed.", {
-      error: String(err?.message || err)
+      error: errorMessage(error)
     });
   }
 });
