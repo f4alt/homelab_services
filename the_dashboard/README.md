@@ -25,7 +25,8 @@ is the single internal backend service on the Compose network.
 
 | Path | Purpose |
 | --- | --- |
-| `dashboard/config.js` | User-editable live dashboard config. |
+| `dashboard/config.js` | Sanitized, tracked dashboard config. |
+| `dashboard/config.local.js` | Ignored live config selected with `DASHBOARD_CONFIG_PATH`. |
 | `dashboard/platform/` | Dashboard shell, shared CSS, helpers, and config validation. |
 | `dashboard/widgets/` | Frontend widget implementations. |
 | `gateway/gateway.js` | Express app setup and route mounting surface. |
@@ -37,8 +38,20 @@ is the single internal backend service on the Compose network.
 ## Configuration
 
 Use `.env` or shell environment variables for infrastructure knobs and secrets.
-Use `dashboard/config.js` for the live non-secret dashboard layout. Keep real
-local values out of git.
+The tracked `dashboard/config.js` is a safe, runnable default. For live local
+values, copy it to the ignored `dashboard/config.local.js` and select that file
+from `.env`:
+
+```sh
+cp dashboard/config.js dashboard/config.local.js
+```
+
+```dotenv
+DASHBOARD_CONFIG_PATH=./dashboard/config.local.js
+```
+
+Both Nginx and Gateway mount the selected file as `config.js`, so the browser
+config editor continues to read and save the active configuration.
 
 Important environment knobs are documented in `.env.example`, including:
 
@@ -133,9 +146,8 @@ Widget-domain companions—including status, netstats, METAR, and todos—live i
 The `calendar` widget reads one public iCalendar subscription from
 `props.feedUrl`. The Gateway validates and pins public DNS destinations,
 revalidates redirects, bounds downloads and recurrence expansion, and returns
-only normalized event titles and times. Replace the non-secret example feed in
-`dashboard/config.js` directly; private and credential-bearing feeds are not
-supported.
+only normalized event titles and times. Add the feed to the ignored local
+configuration; private and credential-bearing feeds are not supported.
 
 The `home-assistant` widget keeps its long-lived access token in the Gateway's
 `HOME_ASSISTANT_TOKEN` environment variable. Its configured buttons accept only

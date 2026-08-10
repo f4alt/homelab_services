@@ -1,5 +1,3 @@
-/* Global dashboard configuration */
-
 window.DASH_CONFIG = {
   apiBase: "/api",
 
@@ -23,16 +21,12 @@ window.DASH_CONFIG = {
         engines: [
           {
             name: "Google",
-            buildUrl: (q) => "https://www.google.com/search?q=" + encodeURIComponent(q)
+            buildUrl: (query) => "https://www.google.com/search?q=" + encodeURIComponent(query)
           },
           {
             name: "Reddit",
-            buildUrl: (q) => "https://www.reddit.com/search/?q=" + encodeURIComponent(q)
-          },
-          {
-            name: "Inventory",
-            buildUrl: (q) => "http://localhost/items?q=" + encodeURIComponent(q)
-          },
+            buildUrl: (query) => "https://www.reddit.com/search/?q=" + encodeURIComponent(query)
+          }
         ]
       }
     },
@@ -47,7 +41,7 @@ window.DASH_CONFIG = {
           { label: "Local", tz: "local" },
           { label: "UTC", tz: "UTC" },
           { label: "Eastern", tz: "America/New_York" },
-          { label: "Canada",  tz: "Canada/Atlantic" }
+          { label: "Atlantic", tz: "Canada/Atlantic" }
         ]
       }
     },
@@ -57,7 +51,7 @@ window.DASH_CONFIG = {
       width: 1,
       refreshMs: 300000,
       props: {
-        feedUrl: "webcal://p166-caldav.icloud.com/published/2/MTEwODg1NDQxMTExMDg4NdzOHAY8veWOp1tk91cymB1QDT2vHydPJDsh5WVZQaVu"
+        feedUrl: ""
       }
     },
     {
@@ -73,12 +67,7 @@ window.DASH_CONFIG = {
       refreshMs: 30000,
       props: {
         tile_minWidth: 220,
-        services: [
-          { name: "Router", icon: "🛜", url: "192.168.1.1" },
-          { name: "Pi-hole", icon: "🛡️", url: "http://localhost/admin/" },
-          { name: "Syncthing", icon: "🗘", url: "http://localhost:18086" },
-          { name: "Home Assistant", icon: "🏠", url: "http://localhost:8123" },
-        ]
+        services: []
       }
     },
     {
@@ -96,10 +85,7 @@ window.DASH_CONFIG = {
       type: "todos",
       id: "todos",
       width: 1,
-      refreshMs: 60000,
-      props: {
-        defaultList: "homelab.org"
-      }
+      refreshMs: 60000
     },
     {
       type: "time-since",
@@ -125,10 +111,8 @@ window.DASH_CONFIG = {
       width: "all",
       refreshMs: 0,
       props: {
-        dashboardUrl: "http://192.168.1.36:8123/",
-        buttons: [
-          {name: "Dummy button", api: ""},
-        ]
+        dashboardUrl: "",
+        buttons: []
       }
     },
     {
@@ -138,6 +122,6 @@ window.DASH_CONFIG = {
       props: {
         text: "GitHub CI intent placeholder. This likely belongs in a dedicated status instance if CI targets would inflate the current status widget."
       }
-    },
+    }
   ]
 };

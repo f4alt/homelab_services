@@ -26,6 +26,7 @@ services:
       - /var/tmp
     volumes:
       - ./dashboard:/usr/share/nginx/html:ro
+      - "${DASHBOARD_CONFIG_PATH:-./dashboard/config.js}:/usr/share/nginx/html/config.js:ro"
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on: [gateway]
@@ -65,7 +66,8 @@ services:
       - default
       - system_health
     volumes:
-      - ./dashboard:/dashboard:rw
+      - ./dashboard:/dashboard:ro
+      - "${DASHBOARD_CONFIG_PATH:-./dashboard/config.js}:/dashboard/config.js:rw"
 
 networks:
   system_health:
