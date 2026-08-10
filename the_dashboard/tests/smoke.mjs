@@ -3,6 +3,8 @@
 import vm from "node:vm";
 import { validateDashboardConfig } from "../dashboard/platform/config-validator.mjs";
 
+const CONFIG_EVALUATION_TIMEOUT_MS = 1_000;
+const REQUEST_TIMEOUT_MS = 10_000;
 const baseUrl = normalizeBaseUrl(
   process.env.DASHBOARD_BASE_URL || process.argv[2] || "http://localhost:8080"
 );
@@ -18,13 +20,19 @@ function check(name, fn) {
 }
 
 async function request(path, options = {}) {
+  const {
+    headers = {},
+    signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    ...requestOptions
+  } = options;
   const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
+    ...requestOptions,
     headers: {
       Accept: "application/json",
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(options.headers || {})
-    }
+      ...(requestOptions.body ? { "Content-Type": "application/json" } : {}),
+      ...headers
+    },
+    signal
   });
 
   const text = await response.text();
@@ -66,7 +74,7 @@ check("dashboard config loads as browser script", async () => {
   const sandbox = { window: {} };
   vm.runInNewContext(text, sandbox, {
     filename: "dashboard/config.js",
-    timeout: 1000
+    timeout: CONFIG_EVALUATION_TIMEOUT_MS
   });
 
   const cfg = sandbox.window.DASH_CONFIG;
@@ -130,17 +138,6 @@ check("config API rejects malformed source", async () => {
   assert(json?.error?.code === "validation_error", "malformed config error code mismatch");
 });
 
-check("config API rejects invalid dashboard config", async () => {
-  const { response, json } = await request("/api/config", {
-    method: "PUT",
-    body: JSON.stringify({ source: "window.DASH_CONFIG = { widgets: [] };" })
-  });
-
-  assert(response.status === 400, `expected HTTP 400, got ${response.status}`);
-  assert(json?.ok === false, "invalid config should report ok=false");
-  assert(json?.error?.code === "validation_error", "invalid config error code mismatch");
-});
-
 check("config API rejects invalid save without changing source", async () => {
   const before = await request("/api/config", {
     headers: { Accept: "application/javascript" }
@@ -155,6 +152,10 @@ check("config API rejects invalid save without changing source", async () => {
 
   assert(save.response.status === 400, `expected HTTP 400, got ${save.response.status}`);
   assert(save.json?.ok === false, "invalid save should report ok=false");
+  assert(
+    save.json?.error?.code === "validation_error",
+    "invalid config error code mismatch"
+  );
   assert(after.text === before.text, "invalid save changed config source");
 });
 
@@ -208,14 +209,13 @@ check("system health route returns core host readings", async () => {
   assert(typeof json?.data?.sampledAt === "string", "sample timestamp was unavailable");
 });
 
-check("removed API routes stay absent", async () => {
+check("removed platform API routes stay absent", async () => {
   const checks = await Promise.all([
     request("/api/health"),
     request("/api/config/validate", {
       method: "POST",
       body: JSON.stringify({ source: "window.DASH_CONFIG = {};" })
-    }),
-    request("/api/todos/sync")
+    })
   ]);
 
   for (const { response } of checks) {

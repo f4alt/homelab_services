@@ -5,14 +5,20 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ALLOWED_STATUS = 200;
+const COMPOSE_EXEC_TIMEOUT_MS = 30_000;
 const DENIED_STATUS = 403;
 const DASHBOARD_DIRECTORY = fileURLToPath(new URL("..", import.meta.url));
+const PROXY_REQUEST_TIMEOUT_MS = 5_000;
 const PROBE_SOURCE = `
   const baseUrl = "http://docker_socket_proxy:2375";
+  const request = (path, options = {}) => fetch(baseUrl + path, {
+    ...options,
+    signal: AbortSignal.timeout(${PROXY_REQUEST_TIMEOUT_MS})
+  });
   const probes = await Promise.all([
-    fetch(baseUrl + "/containers/json?all=1"),
-    fetch(baseUrl + "/containers/create", { method: "POST" }),
-    fetch(baseUrl + "/images/json")
+    request("/containers/json?all=1"),
+    request("/containers/create", { method: "POST" }),
+    request("/images/json")
   ]);
   console.log(JSON.stringify(probes.map((response) => response.status)));
 `;
@@ -32,7 +38,7 @@ function runProxyProbe() {
     execFile(
       "docker",
       COMPOSE_EXEC_ARGUMENTS,
-      { cwd: DASHBOARD_DIRECTORY },
+      { cwd: DASHBOARD_DIRECTORY, timeout: COMPOSE_EXEC_TIMEOUT_MS },
       (error, stdout, stderr) => {
         if (error) {
           reject(new Error(`Container proxy verification failed: ${stderr || error.message}`));

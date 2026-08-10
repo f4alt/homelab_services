@@ -5,6 +5,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { validateDashboardConfig } from "../dashboard/platform/config-validator.mjs";
 
+const CONFIG_EVALUATION_TIMEOUT_MS = 1_000;
 const configPath = process.argv[2] || "dashboard/config.js";
 const absolutePath = path.resolve(configPath);
 const source = fs.readFileSync(absolutePath, "utf8");
@@ -13,7 +14,7 @@ function loadConfig() {
   const sandbox = { window: {} };
   vm.runInNewContext(source, sandbox, {
     filename: absolutePath,
-    timeout: 1000
+    timeout: CONFIG_EVALUATION_TIMEOUT_MS
   });
   return sandbox.window.DASH_CONFIG;
 }
