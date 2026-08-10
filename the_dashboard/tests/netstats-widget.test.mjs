@@ -1,91 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createSuccessResponse } from "./helpers/test-utils.mjs";
+import { FakeElement } from "./helpers/fake-dom.mjs";
+import {
+  createSuccessResponse,
+  withPatchedGlobals
+} from "./helpers/test-utils.mjs";
 
-class FakeClassList {
-  constructor() {
-    this.values = new Set();
-  }
+const CHART_HEIGHT_PX = 110;
+const CHART_WIDTH_PX = 500;
 
-  add(...values) {
-    values.forEach((value) => this.values.add(value));
-  }
-
-  contains(value) {
-    return this.values.has(value);
-  }
-
-  remove(...values) {
-    values.forEach((value) => this.values.delete(value));
-  }
-
-  toggle(value, force) {
-    const enabled = force ?? !this.contains(value);
-    if (enabled) this.add(value);
-    else this.remove(value);
-    return enabled;
-  }
-}
-
-class FakeElement {
+class NetstatsElement extends FakeElement {
   constructor(tagName) {
-    this.tagName = tagName;
-    this.attributes = new Map();
-    this.children = [];
-    this.classList = new FakeClassList();
-    this.clientHeight = 110;
-    this.clientWidth = 500;
-    this.events = new Map();
-    this.textContent = "";
-  }
-
-  set className(value) {
-    this.classList.values = new Set(String(value || "").split(/\s+/).filter(Boolean));
-  }
-
-  get className() {
-    return [...this.classList.values].join(" ");
-  }
-
-  get firstChild() {
-    return this.children[0] || null;
-  }
-
-  addEventListener(type, listener) {
-    const listeners = this.events.get(type) || new Set();
-    listeners.add(listener);
-    this.events.set(type, listeners);
-  }
-
-  append(...children) {
-    children.forEach((child) => this.appendChild(child));
-  }
-
-  appendChild(child) {
-    this.children.push(child);
-    return child;
-  }
-
-  fire(type) {
-    for (const listener of this.events.get(type) || []) listener({ target: this });
-  }
-
-  getAttribute(name) {
-    return this.attributes.get(name) ?? null;
-  }
-
-  removeChild(child) {
-    const index = this.children.indexOf(child);
-    if (index !== -1) this.children.splice(index, 1);
-  }
-
-  replaceChildren(...children) {
-    this.children = children;
-  }
-
-  setAttribute(name, value) {
-    this.attributes.set(name, String(value));
+    super(tagName);
+    this.clientHeight = CHART_HEIGHT_PX;
+    this.clientWidth = CHART_WIDTH_PX;
   }
 }
 
@@ -103,89 +32,82 @@ async function flushAsyncWork() {
   await new Promise((resolve) => setImmediate(resolve));
 }
 
-test("netstats starts paused when configured and prevents overlapping work", async () => {
-  const previous = {
-    document: globalThis.document,
-    fetch: globalThis.fetch,
-    setInterval: globalThis.setInterval,
-    window: globalThis.window
+function createNetstatsDocument(head) {
+  return {
+    createElement: (tagName) => new NetstatsElement(tagName),
+    createElementNS: (_namespace, tagName) => new NetstatsElement(tagName),
+    getElementById: () => null,
+    head
   };
-  const head = new FakeElement("head");
+}
+
+function createWidgetWindow(registerWidget) {
+  return {
+    DASH_CONFIG: { apiBase: "/api" },
+    DASH: { registerWidget }
+  };
+}
+
+test("netstats starts paused when configured and prevents overlapping work", async () => {
+  const head = new NetstatsElement("head");
   const intervalCallbacks = [];
   const pending = [];
   const requestCounts = { ip: 0, ping: 0, speed: 0 };
   let registration;
-  globalThis.document = {
-    createElement: (tagName) => new FakeElement(tagName),
-    createElementNS: (_namespace, tagName) => new FakeElement(tagName),
-    getElementById: () => null,
-    head
-  };
-  globalThis.setInterval = (callback) => {
-    intervalCallbacks.push(callback);
-    return intervalCallbacks.length;
-  };
-  globalThis.fetch = (url) => {
-    const kind = url.includes("/myip") ? "ip" : url.includes("/ping") ? "ping" : "speed";
-    requestCounts[kind] += 1;
-    return new Promise((resolve) => pending.push(() => resolve(responseFor(url))));
-  };
-  globalThis.window = {
-    DASH_CONFIG: { apiBase: "/api" },
-    DASH: {
-      registerWidget(type, implementation) {
-        registration = { type, implementation };
-      }
+
+  await withPatchedGlobals({
+    document: createNetstatsDocument(head),
+    fetch(url) {
+      const kind = url.includes("/myip") ? "ip" : url.includes("/ping") ? "ping" : "speed";
+      requestCounts[kind] += 1;
+      return new Promise((resolve) => pending.push(() => resolve(responseFor(url))));
+    },
+    setInterval(callback) {
+      intervalCallbacks.push(callback);
+      return intervalCallbacks.length;
+    },
+    window: createWidgetWindow((type, implementation) => {
+      registration = { type, implementation };
+    })
+  }, async () => {
+    try {
+      await import(`../dashboard/widgets/netstats.js?test=${Date.now()}`);
+      const root = new NetstatsElement("section");
+      const instance = registration.implementation.mount(root, {
+        props: {
+          ipRefreshMs: 1000,
+          pingIntervalMs: 1000,
+          maxSamples: 5,
+          start_paused: true
+        }
+      });
+      await registration.implementation.update(instance);
+
+      intervalCallbacks[0]();
+      intervalCallbacks[0]();
+      intervalCallbacks[1]();
+      intervalCallbacks[1]();
+      assert.deepEqual(requestCounts, { ip: 1, ping: 0, speed: 0 });
+      assert.equal(instance.chartWrap.getAttribute("aria-pressed"), "true");
+      assert.equal(instance.chartWrap.getAttribute("aria-label"), "Resume latency polling");
+      assert.equal(instance.overlay.textContent, "⏸");
+
+      instance.chartWrap.fire("click");
+      intervalCallbacks[1]();
+      intervalCallbacks[1]();
+      instance.speedBlock.fire("click");
+      instance.speedBlock.fire("click");
+
+      assert.deepEqual(requestCounts, { ip: 1, ping: 1, speed: 1 });
+    } finally {
+      pending.forEach((resolve) => resolve());
+      await new Promise((resolve) => setImmediate(resolve));
     }
-  };
-
-  try {
-    await import(`../dashboard/widgets/netstats.js?test=${Date.now()}`);
-    const root = new FakeElement("section");
-    const instance = registration.implementation.mount(root, {
-      props: {
-        ipRefreshMs: 1000,
-        pingIntervalMs: 1000,
-        maxSamples: 5,
-        start_paused: true
-      }
-    });
-    await registration.implementation.update(instance);
-
-    intervalCallbacks[0]();
-    intervalCallbacks[0]();
-    intervalCallbacks[1]();
-    intervalCallbacks[1]();
-    assert.deepEqual(requestCounts, { ip: 1, ping: 0, speed: 0 });
-    assert.equal(instance.chartWrap.getAttribute("aria-pressed"), "true");
-    assert.equal(instance.chartWrap.getAttribute("aria-label"), "Resume latency polling");
-    assert.equal(instance.overlay.textContent, "⏸");
-
-    instance.chartWrap.fire("click");
-    intervalCallbacks[1]();
-    intervalCallbacks[1]();
-    instance.speedBlock.fire("click");
-    instance.speedBlock.fire("click");
-
-    assert.deepEqual(requestCounts, { ip: 1, ping: 1, speed: 1 });
-  } finally {
-    pending.forEach((resolve) => resolve());
-    await new Promise((resolve) => setImmediate(resolve));
-    globalThis.document = previous.document;
-    globalThis.fetch = previous.fetch;
-    globalThis.setInterval = previous.setInterval;
-    globalThis.window = previous.window;
-  }
+  });
 });
 
 test("netstats preserves readings through failures and clears stale state after recovery", async () => {
-  const previous = {
-    document: globalThis.document,
-    fetch: globalThis.fetch,
-    setInterval: globalThis.setInterval,
-    window: globalThis.window
-  };
-  const head = new FakeElement("head");
+  const head = new NetstatsElement("head");
   const intervalCallbacks = [];
   const responses = {
     ip: [
@@ -205,34 +127,25 @@ test("netstats preserves readings through failures and clears stale state after 
     ]
   };
   let registration;
-  globalThis.document = {
-    createElement: (tagName) => new FakeElement(tagName),
-    createElementNS: (_namespace, tagName) => new FakeElement(tagName),
-    getElementById: () => null,
-    head
-  };
-  globalThis.setInterval = (callback) => {
-    intervalCallbacks.push(callback);
-    return intervalCallbacks.length;
-  };
-  globalThis.fetch = async (url) => {
-    const kind = url.includes("/myip") ? "ip" : url.includes("/ping") ? "ping" : "speed";
-    const response = responses[kind].shift();
-    if (response instanceof Error) throw response;
-    return response;
-  };
-  globalThis.window = {
-    DASH_CONFIG: { apiBase: "/api" },
-    DASH: {
-      registerWidget(type, implementation) {
-        registration = { type, implementation };
-      }
-    }
-  };
 
-  try {
+  await withPatchedGlobals({
+    document: createNetstatsDocument(head),
+    async fetch(url) {
+      const kind = url.includes("/myip") ? "ip" : url.includes("/ping") ? "ping" : "speed";
+      const response = responses[kind].shift();
+      if (response instanceof Error) throw response;
+      return response;
+    },
+    setInterval(callback) {
+      intervalCallbacks.push(callback);
+      return intervalCallbacks.length;
+    },
+    window: createWidgetWindow((type, implementation) => {
+      registration = { type, implementation };
+    })
+  }, async () => {
     await import(`../dashboard/widgets/netstats.js?recovery=${Date.now()}`);
-    const root = new FakeElement("section");
+    const root = new NetstatsElement("section");
     const instance = registration.implementation.mount(root, {
       props: { ipRefreshMs: 1000, pingIntervalMs: 1000, maxSamples: 5 }
     });
@@ -245,8 +158,8 @@ test("netstats preserves readings through failures and clears stale state after 
     assert.equal(instance.speedBlock.type, "button");
     assert.equal(instance.chartWrap.tagName, "button");
     assert.equal(instance.chartWrap.getAttribute("aria-pressed"), "false");
-    assert.equal(instance.valIP.textContent, "203.0.113.10");
-    assert.equal(instance.valDL.textContent, "100 Mbps");
+    assert.equal(instance.ipValue.textContent, "203.0.113.10");
+    assert.equal(instance.downloadValue.textContent, "100 Mbps");
     assert.deepEqual(instance.samples, [20]);
 
     intervalCallbacks[0]();
@@ -254,13 +167,13 @@ test("netstats preserves readings through failures and clears stale state after 
     instance.speedBlock.fire("click");
     await flushAsyncWork();
 
-    assert.equal(instance.valIP.textContent, "203.0.113.10");
-    assert.equal(instance.valDL.textContent, "100 Mbps");
+    assert.equal(instance.ipValue.textContent, "203.0.113.10");
+    assert.equal(instance.downloadValue.textContent, "100 Mbps");
     assert.deepEqual(instance.samples, [20]);
     assert.match(instance.ipStatus.textContent, /showing previous value/);
     assert.match(instance.pingStatus.textContent, /showing previous samples/);
     assert.match(instance.speedStatus.textContent, /showing previous result/);
-    assert.equal(instance.rowIP.classList.contains("warn"), true);
+    assert.equal(instance.ipRow.classList.contains("warn"), true);
     assert.equal(instance.chartWrap.classList.contains("warn"), true);
     assert.equal(instance.speedBlock.classList.contains("warn"), true);
     assert.equal(instance.speedBlock.getAttribute("aria-busy"), "false");
@@ -270,13 +183,13 @@ test("netstats preserves readings through failures and clears stale state after 
     instance.speedBlock.fire("click");
     await flushAsyncWork();
 
-    assert.equal(instance.valIP.textContent, "203.0.113.11");
-    assert.equal(instance.valDL.textContent, "120 Mbps");
+    assert.equal(instance.ipValue.textContent, "203.0.113.11");
+    assert.equal(instance.downloadValue.textContent, "120 Mbps");
     assert.deepEqual(instance.samples, [20, 30]);
     assert.equal(instance.ipStatus.textContent, "");
     assert.equal(instance.pingStatus.textContent, "");
     assert.equal(instance.speedStatus.textContent, "");
-    assert.equal(instance.rowIP.classList.contains("warn"), false);
+    assert.equal(instance.ipRow.classList.contains("warn"), false);
     assert.equal(instance.chartWrap.classList.contains("warn"), false);
     assert.equal(instance.speedBlock.classList.contains("warn"), false);
 
@@ -286,10 +199,5 @@ test("netstats preserves readings through failures and clears stale state after 
     instance.chartWrap.fire("click");
     assert.equal(instance.chartWrap.getAttribute("aria-pressed"), "false");
     assert.equal(instance.chartWrap.getAttribute("aria-label"), "Pause latency polling");
-  } finally {
-    globalThis.document = previous.document;
-    globalThis.fetch = previous.fetch;
-    globalThis.setInterval = previous.setInterval;
-    globalThis.window = previous.window;
-  }
+  });
 });
