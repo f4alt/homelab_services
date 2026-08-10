@@ -65,7 +65,8 @@ services:
       - default
       - system_health
     volumes:
-      - ./dashboard:/dashboard:ro
+      # Config saves stage a sibling temporary file before updating the bind mount.
+      - ./dashboard:/dashboard:rw
       - "${DASHBOARD_CONFIG_PATH:-./dashboard/config.js}:/dashboard/config.js:rw"
 
 networks:
