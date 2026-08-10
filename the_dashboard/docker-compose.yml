@@ -1,19 +1,4 @@
 services:
-  docker_socket_proxy:
-    image: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0
-    restart: unless-stopped
-    environment:
-      CONTAINERS: "1"
-      EVENTS: "0"
-      IMAGES: "0"
-      PING: "0"
-      POST: "0"
-      VERSION: "0"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - system_health
-
   nginx:
     image: nginx:alpine
     restart: unless-stopped
@@ -53,22 +38,12 @@ services:
       STATUS_PROBE_CONCURRENCY:
       STATUS_PROBE_ALLOWED_HOSTS:
       PING_TARGET: "${NETSTATS_PING_TARGET:-}"
-      SYSTEM_HEALTH_CONTAINER_API_URL: "${SYSTEM_HEALTH_CONTAINER_API_URL:-http://docker_socket_proxy:2375}"
     read_only: true
     tmpfs:
       - /tmp
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    depends_on:
-      - docker_socket_proxy
-    networks:
-      - default
-      - system_health
     volumes:
       # Config saves stage a sibling temporary file before updating the bind mount.
       - ./dashboard:/dashboard:rw
       - "${DASHBOARD_CONFIG_PATH:-./dashboard/config.js}:/dashboard/config.js:rw"
-
-networks:
-  system_health:
-    internal: true

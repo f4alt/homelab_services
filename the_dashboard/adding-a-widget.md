@@ -191,7 +191,7 @@ Enable the widget in the selected dashboard config. Use
   width: 1,
   refreshMs: 60000,
   props: {
-    tile_minWidth: 220,
+    tileMinWidth: 220,
     query: "recent"
   }
 }
@@ -204,8 +204,8 @@ Enable the widget in the selected dashboard config. Use
 - `refreshMs` is a non-negative number. Use `0` or omit it when shell polling is
   not needed.
 - `props` is an optional object owned by the widget. Use names consistent with
-  existing shared layout props such as `tile_minWidth`, `tile_columns`, and
-  `tile_gap`.
+  existing shared layout props such as `tileMinWidth`, `tileColumns`, and
+  `tileGap`.
 - Put live, non-secret display configuration in the ignored local config. Keep
   the tracked default sanitized; secrets and infrastructure settings belong in
   Gateway environment variables.

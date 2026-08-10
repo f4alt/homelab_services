@@ -95,6 +95,10 @@ test("calendar renders a semantic fixed grid, boolean dots, and the two default 
     assert.equal(registration.type, "calendar");
     assert.equal(buttons.length, 42);
     assert.equal(buttons.every((button) => button.type === "button"), true);
+    assert.equal(buttons.every((button) => (
+      button.classList.contains("clickable")
+      && button.classList.contains("clickable--compact")
+    )), true);
     assert.match(treeText(root), /August 2026\s+Sun\s+Mon\s+Tue\s+Wed\s+Thu\s+Fri\s+Sat/);
     assert.match(treeText(root), /Labor Day/);
     assert.match(treeText(root), /Family day/);

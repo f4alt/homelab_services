@@ -45,12 +45,11 @@ function healthySnapshot() {
     memory: { usedPercent: 61, swapUsedPercent: 0 },
     disk: { usedPercent: 72 },
     temperature: { celsius: 54 },
-    uptimeSeconds: 1_555_200,
-    containers: { total: 11, running: 11, unhealthy: 0, restarting: 0 }
+    uptimeSeconds: 1_555_200
   };
 }
 
-test("system-health renders the minimal six-reading tile", async () => {
+test("system-health renders one compact neutral strip of host readings", async () => {
   const requests = [];
   const snapshot = healthySnapshot();
 
@@ -67,22 +66,28 @@ test("system-health renders the minimal six-reading tile", async () => {
     assert.deepEqual(requests, ["/api/system-health"]);
     assert.match(
       treeText(root),
-      /System\s+Healthy\s+CPU\s+18%\s+RAM\s+61%\s+Disk\s+72%\s+Temp\s+54°C\s+Uptime\s+18d\s+Containers\s+11\/11/
+      /CPU\s+18%\s+RAM\s+61%\s+Disk\s+72%\s+Temp\s+54°C\s+Uptime\s+18d/
     );
-    assert.equal(findByClass(root, "ui-tile") !== null, true);
-    assert.equal(findByClass(root, "severity-ok") !== null, true);
+    assert.equal(treeText(root).includes("System"), false);
+    assert.equal(treeText(root).includes("Healthy"), false);
+    assert.equal(treeText(root).includes("Containers"), false);
+    assert.equal(findByClass(root, "dot"), null);
+    assert.equal(findByClass(root, "system-health-state"), null);
+    assert.equal(findByClass(root, "ui-tile--compact") !== null, true);
+    assert.equal(findByClass(root, "severity-ok"), null);
+    assert.equal(findByClass(root, "severity-warn"), null);
+    assert.equal(findByClass(root, "severity-error"), null);
   });
 });
 
-test("system-health reports unavailable core readings without rendering malformed units", async () => {
+test("system-health warns about unavailable host readings without malformed units", async () => {
   const snapshot = {
     sampledAt: new Date().toISOString(),
     cpu: { usagePercent: 18, ioWaitPercent: 0 },
     memory: { usedPercent: 61, swapUsedPercent: 0 },
     disk: { usedPercent: 72 },
     temperature: { celsius: null },
-    uptimeSeconds: 3600,
-    containers: null
+    uptimeSeconds: 3600
   };
 
   await withSystemHealthWidget(
@@ -93,33 +98,25 @@ test("system-health reports unavailable core readings without rendering malforme
 
       await registration.implementation.update(state);
 
-      assert.equal(findByClass(root, "system-health-state").textContent, "Attention");
       assert.equal(
         findByClass(root, "system-health-warning").textContent,
-        "Temperature unavailable · Container health unavailable"
+        "Temperature unavailable"
       );
-      assert.match(treeText(root), /Temp\s+—\s+Uptime\s+1h\s+Containers\s+—/);
+      assert.match(treeText(root), /Temp\s+—\s+Uptime\s+1h/);
       assert.equal(treeText(root).includes("—°C"), false);
+      assert.equal(findByClass(root, "severity-warn") !== null, true);
     }
   );
 });
 
-test("system-health applies configured labels and warning thresholds", async () => {
+test("system-health applies configured warning thresholds without a title", async () => {
   const snapshot = {
     sampledAt: new Date().toISOString(),
     cpu: { usagePercent: 40, ioWaitPercent: 0 },
     memory: { usedPercent: 50, swapUsedPercent: 0 },
     disk: { usedPercent: 50 },
     temperature: { celsius: 50 },
-    uptimeSeconds: 3600,
-    containers: {
-      total: 3,
-      running: 3,
-      unhealthy: 0,
-      restarting: 0,
-      exited: 0,
-      paused: 0
-    }
+    uptimeSeconds: 3600
   };
 
   await withSystemHealthWidget(
@@ -132,29 +129,21 @@ test("system-health applies configured labels and warning thresholds", async () 
 
       await registration.implementation.update(state);
 
-      assert.match(treeText(root), /Server\s+Attention/);
+      assert.equal(treeText(root).includes("Server"), false);
       assert.equal(findByClass(root, "system-health-warning").textContent, "CPU high");
+      assert.equal(findByClass(root, "severity-warn") !== null, true);
     }
   );
 });
 
-test("system-health keeps problems in one warning line and escalates unhealthy containers", async () => {
+test("system-health keeps host problems in one warning line", async () => {
   const snapshot = {
     sampledAt: new Date().toISOString(),
     cpu: { usagePercent: 91, ioWaitPercent: 22 },
     memory: { usedPercent: 88, swapUsedPercent: 25 },
     disk: { usedPercent: 92 },
     temperature: { celsius: 85 },
-    uptimeSeconds: 3600,
-    containers: {
-      total: 5,
-      running: 2,
-      unhealthy: 1,
-      restarting: 1,
-      exited: 1,
-      paused: 0,
-      other: 1
-    }
+    uptimeSeconds: 3600
   };
 
   await withSystemHealthWidget(
@@ -165,11 +154,11 @@ test("system-health keeps problems in one warning line and escalates unhealthy c
 
       await registration.implementation.update(state);
 
-      assert.equal(findByClass(root, "system-health-state").textContent, "Unhealthy");
-      assert.equal(findByClass(root, "severity-error") !== null, true);
+      assert.equal(findByClass(root, "severity-warn") !== null, true);
+      assert.equal(findByClass(root, "severity-error"), null);
       assert.equal(
         findByClass(root, "system-health-warning").textContent,
-        "CPU high · Memory high · Disk nearly full · Temperature high · I/O wait high · Swap in use · 1 container unhealthy · 1 container restarting · 1 container exited · 1 container not running"
+        "CPU high · Memory high · Disk nearly full · Temperature high · I/O wait high · Swap in use"
       );
     }
   );
@@ -182,8 +171,7 @@ test("system-health preserves the last snapshot when a refresh fails", async () 
     memory: { usedPercent: 61, swapUsedPercent: 0 },
     disk: { usedPercent: 72 },
     temperature: null,
-    uptimeSeconds: 3600,
-    containers: null
+    uptimeSeconds: 3600
   };
   const responses = [
     createSuccessResponse(snapshot),
@@ -200,11 +188,11 @@ test("system-health preserves the last snapshot when a refresh fails", async () 
       await registration.implementation.update(state);
 
       assert.match(treeText(root), /CPU\s+18%/);
-      assert.equal(findByClass(root, "system-health-state").textContent, "Attention");
       assert.equal(
         findByClass(root, "system-health-warning").textContent,
-        "Temperature unavailable · Container health unavailable · Gateway unavailable. Showing the previous snapshot."
+        "Temperature unavailable · Gateway unavailable. Showing the previous snapshot."
       );
+      assert.equal(findByClass(root, "severity-error") !== null, true);
     }
   );
 });
@@ -218,8 +206,7 @@ test("system-health ignores an older response after a newer refresh starts", asy
       memory: { usedPercent: 50, swapUsedPercent: 0 },
       disk: { usedPercent: 50 },
       temperature: null,
-      uptimeSeconds: 3600,
-      containers: null
+      uptimeSeconds: 3600
     },
     {
       sampledAt: new Date().toISOString(),
@@ -227,8 +214,7 @@ test("system-health ignores an older response after a newer refresh starts", asy
       memory: { usedPercent: 50, swapUsedPercent: 0 },
       disk: { usedPercent: 50 },
       temperature: null,
-      uptimeSeconds: 3600,
-      containers: null
+      uptimeSeconds: 3600
     }
   ];
   let requestCount = 0;

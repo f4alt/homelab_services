@@ -13,13 +13,7 @@ const SNAPSHOT = {
   memory: { usedPercent: 61, swapUsedPercent: 0 },
   disk: { usedPercent: 72 },
   temperature: { celsius: 54 },
-  uptimeSeconds: 1_555_200,
-  containers: {
-    total: 11,
-    running: 11,
-    unhealthy: 0,
-    restarting: 0
-  }
+  uptimeSeconds: 1_555_200
 };
 
 test("system health returns one host snapshot in the standard Gateway envelope", async () => {
@@ -97,8 +91,7 @@ test("system health collects CPU, memory, disk, and uptime from Linux host data"
     memory: { usedPercent: 61, swapUsedPercent: 0 },
     disk: { usedPercent: 72 },
     temperature: null,
-    uptimeSeconds: 1_555_200,
-    containers: null
+    uptimeSeconds: 1_555_200
   });
 });
 
@@ -134,80 +127,4 @@ test("system health selects a CPU temperature without confusing it with storage 
   const snapshot = await collector.collectSnapshot();
 
   assert.deepEqual(snapshot.temperature, { celsius: 52.1 });
-});
-
-test("system health summarizes container states through a configured read-only proxy", async () => {
-  const files = new Map([
-    ["/proc/stat", [
-      "cpu  100 0 100 800 0 0 0 0\n",
-      "cpu  150 0 150 900 0 0 0 0\n"
-    ]],
-    ["/proc/meminfo", ["MemTotal: 100 kB\nMemAvailable: 50 kB\n"]],
-    ["/proc/uptime", ["3600 0\n"]]
-  ]);
-  const requests = [];
-  const collector = createSystemHealthCollector({
-    containerApiUrl: "http://docker-proxy.test:2375",
-    delay: async () => {},
-    readFile: async (path) => files.get(path)?.shift(),
-    readdir: async () => [],
-    statfs: async () => ({ bsize: 1, blocks: 100, bfree: 50, bavail: 50 }),
-    fetchImpl: async (url, options) => {
-      requests.push({ url: url.toString(), options });
-      return {
-        ok: true,
-        async json() {
-          return [
-            { State: "running", Status: "Up 2 hours (healthy)" },
-            { State: "running", Status: "Up 2 hours (unhealthy)" },
-            { State: "restarting", Status: "Restarting (1) 5 seconds ago" },
-            { State: "exited", Status: "Exited (1) 1 minute ago" },
-            { State: "paused", Status: "Up 2 hours (Paused)" },
-            { State: "created", Status: "Created" }
-          ];
-        }
-      };
-    }
-  });
-
-  const snapshot = await collector.collectSnapshot();
-
-  assert.deepEqual(snapshot.containers, {
-    total: 6,
-    running: 2,
-    unhealthy: 1,
-    restarting: 1,
-    exited: 1,
-    paused: 1,
-    other: 1
-  });
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].url, "http://docker-proxy.test:2375/containers/json?all=1");
-  assert.equal(requests[0].options.method, "GET");
-});
-
-test("system health preserves host readings when the container proxy is unavailable", async () => {
-  const files = new Map([
-    ["/proc/stat", [
-      "cpu  100 0 100 800 0 0 0 0\n",
-      "cpu  150 0 150 900 0 0 0 0\n"
-    ]],
-    ["/proc/meminfo", ["MemTotal: 100 kB\nMemAvailable: 50 kB\n"]],
-    ["/proc/uptime", ["3600 0\n"]]
-  ]);
-  const collector = createSystemHealthCollector({
-    containerApiUrl: "http://docker-proxy.test:2375",
-    delay: async () => {},
-    readFile: async (path) => files.get(path)?.shift(),
-    readdir: async () => [],
-    statfs: async () => ({ bsize: 1, blocks: 100, bfree: 50, bavail: 50 }),
-    fetchImpl: async () => {
-      throw new Error("Proxy offline");
-    }
-  });
-
-  const snapshot = await collector.collectSnapshot();
-
-  assert.equal(snapshot.cpu.usagePercent, 50);
-  assert.equal(snapshot.containers, null);
 });

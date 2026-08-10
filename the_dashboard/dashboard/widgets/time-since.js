@@ -1,6 +1,8 @@
 import {
   createDismissibleMenu,
   createElement,
+  createResponsiveGrid,
+  createTile,
   fetchJson,
   installWidgetStyles,
   setStateMessage
@@ -16,14 +18,16 @@ const ALL_SOURCES_LABEL = "All";
 const TIME_SINCE_STYLE_ID = "time-since-widget-styles";
 
 const TIME_SINCE_STYLES = `
-    .time-since-row {
+    .time-since-tile {
+      align-items: center;
       display: grid;
-      gap: var(--gap);
-      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: var(--space-sm);
+      justify-items: center;
+      text-align: center;
     }
 
-    .time-since-age {
-      white-space: nowrap;
+    .time-since-name {
+      width: 100%;
     }
 
     .time-since-age-token--normal {
@@ -39,20 +43,17 @@ const TIME_SINCE_STYLES = `
       color: var(--err);
     }
 
-    .time-since-done-button {
-      appearance: none;
-      color: var(--fg);
-      cursor: pointer;
-      font: inherit;
-      white-space: nowrap;
+    .time-since-tooltip {
+      --popup-transform: translateY(-50%);
+
+      left: var(--space-xs);
+      right: var(--space-xs);
+      text-align: left;
+      top: 50%;
+      white-space: normal;
     }
 
-    .time-since-done-button:hover,
-    .time-since-done-button:focus-visible {
-      border-color: var(--clickable-hover-border);
-    }
-
-    .time-since-done-button:disabled {
+    .time-since-reset-button:disabled {
       color: var(--muted);
       cursor: wait;
     }
@@ -97,27 +98,22 @@ function renderMenu(state) {
   }
 }
 
-function createRow(state, item) {
-  const row = createElement("div", "ui-row time-since-row");
+function createTileView(state, item) {
+  const tile = createTile("popup-on-hover time-since-tile");
   const name = createElement("span", "label truncate time-since-name", item.name);
-  const age = createElement("span", "label-info time-since-age");
-  const ageToken = createElement("span", "time-since-age-token");
-  const ageUnit = createElement("span", "time-since-age-unit");
-  age.append(ageToken, ageUnit);
+  const resetButton = document.createElement("button");
+  resetButton.type = "button";
+  const popup = createElement("div", "popup label-info time-since-tooltip");
+  popup.setAttribute("role", "tooltip");
 
-  const doneButton = document.createElement("button");
-  doneButton.type = "button";
-  doneButton.className = "ui-tile ui-tile--compact time-since-done-button";
-  doneButton.textContent = "Done now";
-
-  row.append(name, age, doneButton);
-  const rowView = { row, name, ageToken, ageUnit, doneButton, item };
-  doneButton.addEventListener("click", () => completeNow(state, rowView.item));
-  updateRow(state, rowView, item);
-  return rowView;
+  tile.append(resetButton, name, popup);
+  const tileView = { tile, name, popup, resetButton, item };
+  resetButton.addEventListener("click", () => completeNow(state, tileView.item));
+  updateTileView(state, tileView, item);
+  return tileView;
 }
 
-function updateRow(state, rowView, item) {
+function updateTileView(state, tileView, item) {
   const pendingCompletion = state.pendingCompletions.get(item.uid);
   const presentedItem = pendingCompletion
     ? { ...item, last_done: pendingCompletion.optimisticLastDone }
@@ -128,15 +124,23 @@ function updateRow(state, rowView, item) {
     state.approachingRatio
   );
 
-  rowView.item = item;
-  rowView.row.title = presentation.tooltip;
-  rowView.name.textContent = item.name;
-  rowView.ageToken.className =
-    `time-since-age-token time-since-age-token--${presentation.classification}`;
-  rowView.ageToken.textContent = presentation.ageToken;
-  rowView.ageUnit.textContent = presentation.agePhrase.slice(presentation.ageToken.length);
-  rowView.doneButton.disabled = Boolean(pendingCompletion);
-  rowView.doneButton.setAttribute("aria-label", `Mark ${item.name} done now`);
+  tileView.item = item;
+  tileView.name.textContent = item.name;
+  tileView.popup.textContent = presentation.tooltip;
+  tileView.resetButton.className = [
+    "clickable",
+    "clickable--compact",
+    "value-large",
+    "time-since-reset-button",
+    "time-since-age-token",
+    `time-since-age-token--${presentation.classification}`
+  ].join(" ");
+  tileView.resetButton.textContent = presentation.ageToken;
+  tileView.resetButton.disabled = Boolean(pendingCompletion);
+  tileView.resetButton.setAttribute(
+    "aria-label",
+    `Reset days for ${item.name}. ${presentation.tooltip}`
+  );
 }
 
 function replaceChildrenWhenChanged(container, children) {
@@ -154,34 +158,34 @@ function render(state) {
   state.sourceButton.title = state.currentSource.textContent;
   renderMenu(state);
 
-  state.list.classList.remove("is-loading", "is-empty", "is-error");
+  state.grid.classList.remove("is-loading", "is-empty", "is-error");
 
   const visibleItems = state.selectedSource
     ? state.items.filter((item) => item.source_file === state.selectedSource)
     : state.items;
 
   const currentUids = new Set(state.items.map((item) => item.uid));
-  for (const uid of state.rowViews.keys()) {
-    if (!currentUids.has(uid)) state.rowViews.delete(uid);
+  for (const uid of state.tileViews.keys()) {
+    if (!currentUids.has(uid)) state.tileViews.delete(uid);
   }
 
   if (visibleItems.length === 0) {
-    setStateMessage(state.list, "No tracked activities found.", "empty");
+    setStateMessage(state.grid, "No tracked activities found.", "empty");
     return;
   }
 
-  const visibleRows = [];
+  const visibleTiles = [];
   for (const item of visibleItems) {
-    let rowView = state.rowViews.get(item.uid);
-    if (!rowView) {
-      rowView = createRow(state, item);
-      state.rowViews.set(item.uid, rowView);
+    let tileView = state.tileViews.get(item.uid);
+    if (!tileView) {
+      tileView = createTileView(state, item);
+      state.tileViews.set(item.uid, tileView);
     } else {
-      updateRow(state, rowView, item);
+      updateTileView(state, tileView, item);
     }
-    visibleRows.push(rowView.row);
+    visibleTiles.push(tileView.tile);
   }
-  replaceChildrenWhenChanged(state.list, visibleRows);
+  replaceChildrenWhenChanged(state.grid, visibleTiles);
 }
 
 async function runLoadQueue(state) {
@@ -220,9 +224,8 @@ function replaceOrInsertItem(state, uid, replacement, preferredIndex) {
 }
 
 function showCompletionError(state, error, fallbackMessage) {
-  render(state);
   setStateMessage(
-    state.list,
+    state.grid,
     String(error?.message || fallbackMessage),
     "error"
   );
@@ -303,6 +306,8 @@ window.DASH.registerWidget("time-since", {
     picker.append(sourceButton, menu);
 
     const list = createElement("div", "list-scroll time-since-list");
+    const grid = createResponsiveGrid(props);
+    list.appendChild(grid);
     header.appendChild(picker);
     shell.append(header, list);
     root.replaceChildren(shell);
@@ -312,7 +317,7 @@ window.DASH.registerWidget("time-since", {
       sourceButton,
       currentSource,
       menu,
-      list,
+      grid,
       items: [],
       sources: [],
       selectedSource: ALL_SOURCES,
@@ -320,7 +325,7 @@ window.DASH.registerWidget("time-since", {
       reloadRequested: false,
       menuSources: [],
       menuItems: new Map(),
-      rowViews: new Map(),
+      tileViews: new Map(),
       pendingCompletions: new Map()
     };
 
@@ -330,7 +335,7 @@ window.DASH.registerWidget("time-since", {
       containsTarget: (target) => shell.contains(target)
     });
     sourceButton.addEventListener("click", () => state.menuController.toggle());
-    setStateMessage(list, "Loading tracked activities...", "loading");
+    setStateMessage(grid, "Loading tracked activities...", "loading");
     return state;
   },
 
@@ -339,7 +344,7 @@ window.DASH.registerWidget("time-since", {
       await loadItems(state);
     } catch (error) {
       setStateMessage(
-        state.list,
+        state.grid,
         String(error?.message || "Unable to load tracked activities."),
         "error"
       );

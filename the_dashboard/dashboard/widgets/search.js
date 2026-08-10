@@ -41,8 +41,7 @@ const SEARCH_STYLES = `
 
     .search-engine-menu.popup-menu-open {
       right: 0;
-      top: calc(100% + 6px);
-      background: transparent;
+      top: calc(100% + var(--space-compact));
     }
   `;
 

@@ -1,6 +1,7 @@
 export const CALENDAR_GRID_DAYS = 42;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
-const PROGRESS_DAYS = 365;
+const COUNTDOWN_RANGE_DAYS = CALENDAR_GRID_DAYS;
+const UPCOMING_EVENT_HORIZON_DAYS = 365;
 const PROGRESS_MAX_PERCENT = 100;
 const CHIP_MIN_PERCENT = 5;
 const CHIP_MAX_PERCENT = 95;
@@ -55,7 +56,7 @@ export function calendarDayDifference(target, reference) {
 
 export function countdownState(target, now = new Date()) {
   const days = calendarDayDifference(target, now);
-  const cappedDays = Math.min(Math.abs(days), PROGRESS_DAYS);
+  const cappedDays = Math.min(Math.abs(days), COUNTDOWN_RANGE_DAYS);
   let chipText;
   let mode;
   let futurePercent = 0;
@@ -70,14 +71,14 @@ export function countdownState(target, now = new Date()) {
   } else if (days > 0) {
     chipText = days === 1 ? "in 1 day" : `in ${days} days`;
     mode = "future";
-    futurePercent = ((PROGRESS_DAYS - cappedDays) / PROGRESS_DAYS)
+    futurePercent = ((COUNTDOWN_RANGE_DAYS - cappedDays) / COUNTDOWN_RANGE_DAYS)
       * PROGRESS_MAX_PERCENT;
     rawChipPercent = futurePercent;
   } else {
     const overdueDays = Math.abs(days);
     chipText = overdueDays === 1 ? "1 day ago" : `${overdueDays} days ago`;
     mode = "overdue";
-    overduePercent = (cappedDays / PROGRESS_DAYS) * PROGRESS_MAX_PERCENT;
+    overduePercent = (cappedDays / COUNTDOWN_RANGE_DAYS) * PROGRESS_MAX_PERCENT;
     rawChipPercent = PROGRESS_MAX_PERCENT - overduePercent;
   }
 
@@ -213,7 +214,11 @@ function upcomingEventCandidate(event, now, originalIndex) {
     targetDate = start <= now ? today : startOfLocalDay(start);
   }
 
-  if (calendarDayDifference(targetDate, today) > PROGRESS_DAYS) return null;
+  if (
+    calendarDayDifference(targetDate, today) > UPCOMING_EVENT_HORIZON_DAYS
+  ) {
+    return null;
+  }
 
   return {
     event,

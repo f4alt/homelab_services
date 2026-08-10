@@ -283,7 +283,7 @@ window.DASH.registerWidget("netstats", {
       ipRefreshMs: props?.ipRefreshMs ?? DEFAULT_IP_REFRESH_MS,
       pingIntervalMs: props?.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS,
       maxSamples: props?.maxSamples ?? DEFAULT_MAX_SAMPLES,
-      startPaused: props?.start_paused === true
+      startPaused: props?.startPaused === true
     };
     const wrap = document.createElement("div");
     wrap.className = "panel-split";

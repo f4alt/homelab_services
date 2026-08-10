@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildMonthGrid,
+  CALENDAR_GRID_DAYS,
   calendarDayDifference,
   countdownState,
   eventsForDate,
@@ -47,20 +48,44 @@ test("calendar-day differences do not assume every local day is 24 hours", () =>
   assert.equal(calendarDayDifference(afterFallDst, beforeFallDst), 2);
 });
 
-test("countdown bars use one capped 365-day scale in both directions", () => {
+test("countdown bars clamp both directions to the 42-day calendar range", () => {
   const now = new Date(2026, 7, 9, 12);
+  const lastDayInsideRange = CALENDAR_GRID_DAYS - 1;
+  const firstDayOutsideRange = CALENDAR_GRID_DAYS + 1;
+  const countdownAtOffset = (dayOffset) => countdownState(
+    new Date(2026, 7, 9 + dayOffset),
+    now
+  );
 
-  assert.deepEqual(countdownState(new Date(2026, 7, 9), now), {
+  assert.deepEqual(countdownAtOffset(0), {
     chipText: "TODAY",
     mode: "today",
     futurePercent: 100,
     overduePercent: 0,
     chipPercent: 95
   });
-  assert.equal(countdownState(new Date(2026, 7, 10), now).chipText, "in 1 day");
-  assert.equal(countdownState(new Date(2026, 7, 8), now).chipText, "1 day ago");
-  assert.equal(countdownState(new Date(2027, 7, 10), now).futurePercent, 0);
-  assert.equal(countdownState(new Date(2025, 7, 8), now).overduePercent, 100);
+  assert.equal(countdownAtOffset(1).chipText, "in 1 day");
+  assert.equal(countdownAtOffset(-1).chipText, "1 day ago");
+
+  const futureInside = countdownAtOffset(lastDayInsideRange);
+  assert.equal(
+    futureInside.futurePercent,
+    (1 / CALENDAR_GRID_DAYS) * 100
+  );
+  assert.equal(countdownAtOffset(CALENDAR_GRID_DAYS).futurePercent, 0);
+  const futureOutside = countdownAtOffset(firstDayOutsideRange);
+  assert.equal(futureOutside.futurePercent, 0);
+  assert.equal(futureOutside.chipText, "in 43 days");
+
+  const overdueInside = countdownAtOffset(-lastDayInsideRange);
+  assert.equal(
+    overdueInside.overduePercent,
+    (lastDayInsideRange / CALENDAR_GRID_DAYS) * 100
+  );
+  assert.equal(countdownAtOffset(-CALENDAR_GRID_DAYS).overduePercent, 100);
+  const overdueOutside = countdownAtOffset(-firstDayOutsideRange);
+  assert.equal(overdueOutside.overduePercent, 100);
+  assert.equal(overdueOutside.chipText, "43 days ago");
 });
 
 test("next federal holiday includes observed dates across calendar years", () => {
@@ -177,6 +202,17 @@ test("next event is the earliest occurrence that has not ended, with stable ties
   assert.equal(
     nextCalendarEvent([ended, tiedLater, tiedEarlier], now).event.id,
     "tied-earlier"
+  );
+
+  const beyondCountdownRange = timed(
+    "beyond-countdown-range",
+    new Date(2026, 7, 9 + CALENDAR_GRID_DAYS + 1, 9),
+    new Date(2026, 7, 9 + CALENDAR_GRID_DAYS + 1, 10),
+    0
+  );
+  assert.equal(
+    nextCalendarEvent([ended, beyondCountdownRange], now).event.id,
+    "beyond-countdown-range"
   );
 
   const beyondHorizon = timed(

@@ -28,12 +28,17 @@ const WEEKDAY_LABELS = Object.freeze(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", 
 
 const CALENDAR_STYLES = `
     .calendar-widget {
-      --calendar-cell-gap: var(--space-xs);
-      --calendar-cell-height: 34px;
-      --tile-padding: var(--space-comfortable);
+      --calendar-cell-gap: var(--space-hairline);
+      --calendar-cell-height: calc(
+        var(--space-comfortable) + var(--space-comfortable)
+      );
+      --calendar-day-number-size: calc(var(--space-sm) + var(--space-control));
+      --calendar-day-number-font-size: 11px;
+      --progress-height: var(--space-compact);
+      --tile-padding: var(--space-sm);
       display: flex;
       flex-direction: column;
-      gap: var(--gap);
+      gap: var(--space-compact);
     }
 
     .calendar-heading {
@@ -61,25 +66,19 @@ const CALENDAR_STYLES = `
 
     .calendar-day {
       align-items: center;
-      appearance: none;
       background: transparent;
       border: 1px solid transparent;
-      border-radius: var(--radius);
-      color: var(--fg);
-      cursor: pointer;
       display: flex;
       flex-direction: column;
-      font: inherit;
       gap: var(--space-hairline);
       height: var(--calendar-cell-height);
       justify-content: center;
       min-width: 0;
-      padding: var(--space-hairline);
+      padding: 0;
     }
 
     .calendar-day:hover {
       background: rgba(var(--ok-rgb), .08);
-      border-color: var(--card-border);
     }
 
     .calendar-day:focus-visible {
@@ -103,11 +102,11 @@ const CALENDAR_STYLES = `
       border: 1px solid transparent;
       border-radius: 50%;
       display: inline-flex;
-      font-size: 12px;
-      height: 22px;
+      font-size: var(--calendar-day-number-font-size);
+      height: var(--calendar-day-number-size);
       justify-content: center;
       line-height: 1;
-      width: 22px;
+      width: var(--calendar-day-number-size);
     }
 
     .calendar-day--today .calendar-day-number {
@@ -129,16 +128,16 @@ const CALENDAR_STYLES = `
     .calendar-lower {
       display: flex;
       flex-direction: column;
-      gap: var(--space-control);
+      gap: var(--space-compact);
       min-width: 0;
     }
 
     .calendar-countdown {
       display: flex;
       flex-direction: column;
-      gap: 9px;
+      gap: var(--space-xs);
       min-width: 0;
-      padding-top: 4px;
+      padding-top: var(--space-hairline);
       position: relative;
     }
 
@@ -148,7 +147,7 @@ const CALENDAR_STYLES = `
     }
 
     .calendar-countdown .popup {
-      bottom: 18px;
+      bottom: calc(var(--progress-height) + var(--space-sm));
       --popup-transform: translateX(-50%);
     }
 
@@ -189,15 +188,10 @@ const CALENDAR_STYLES = `
 
     @media (max-width: 420px) {
       .calendar-widget {
-        --calendar-cell-gap: var(--space-hairline);
-        --calendar-cell-height: 30px;
-        --tile-padding: var(--space-control);
-      }
-
-      .calendar-day-number {
-        font-size: 11px;
-        height: 19px;
-        width: 19px;
+        --calendar-cell-height: calc(var(--space-md) + var(--space-comfortable));
+        --calendar-day-number-size: calc(var(--space-sm) + var(--space-sm));
+        --calendar-day-number-font-size: 10px;
+        --tile-padding: var(--space-compact);
       }
     }
   `;
@@ -221,7 +215,10 @@ function monthIdentity(date) {
 }
 
 function createDayButton() {
-  const button = createElement("button", "calendar-day");
+  const button = createElement(
+    "button",
+    "calendar-day clickable clickable--compact"
+  );
   button.type = "button";
   const number = createElement("span", "calendar-day-number");
   const dot = createElement("span", "calendar-day-dot");
@@ -309,7 +306,6 @@ function renderGrid(state) {
     const isSelected = state.selectedDateKey === day.dateKey;
     controls.number.textContent = String(day.dayNumber);
     controls.dot.hidden = !hasEvents;
-    controls.button.className = "calendar-day";
     controls.button.classList.toggle("calendar-day--spillover", !day.isCurrentMonth);
     controls.button.classList.toggle("calendar-day--today", day.isToday);
     controls.button.classList.toggle("calendar-day--selected", isSelected);

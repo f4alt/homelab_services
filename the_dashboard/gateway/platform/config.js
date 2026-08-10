@@ -1,3 +1,6 @@
+export const DOCKER_HOST_ALIAS = "host.docker.internal";
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
 function parsePositiveInt(env, name, fallback) {
   const raw = env[name] ?? String(fallback);
   const value = Number(raw);
@@ -21,15 +24,22 @@ function parseUrlBase(env, name, fallback) {
   const withProtocol = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
   const url = new URL(withProtocol);
 
-  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-    url.hostname = "host.docker.internal";
+  if (hostIsLocal(url.hostname)) {
+    url.hostname = DOCKER_HOST_ALIAS;
   }
 
   return url.toString().replace(/\/+$/, "");
 }
 
 function normalizeHost(hostname) {
-  return String(hostname || "").trim().toLowerCase();
+  return String(hostname || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
+}
+
+export function hostIsLocal(hostname) {
+  return LOCAL_HOSTS.has(normalizeHost(hostname));
 }
 
 export function hostIsAllowed(hostname, patterns) {
@@ -67,9 +77,6 @@ function readGatewayConfig(env = process.env) {
     dashboardConfigPath: "/dashboard/config.js",
     dashboardConfigValidatorPath: "/dashboard/platform/config-validator.mjs",
     upstreamTimeoutMs: parsePositiveInt(env, "GATEWAY_UPSTREAM_TIMEOUT_MS", 5000),
-    systemHealth: {
-      containerApiUrl: parseUrlBase(env, "SYSTEM_HEALTH_CONTAINER_API_URL", "")
-    },
     statusProbe: {
       timeoutMs: parsePositiveInt(env, "STATUS_PROBE_TIMEOUT_MS", 5000),
       maxTargets: parsePositiveInt(env, "STATUS_PROBE_MAX_TARGETS", 100),
@@ -77,7 +84,7 @@ function readGatewayConfig(env = process.env) {
       allowedHosts: parseCsv(
         env,
         "STATUS_PROBE_ALLOWED_HOSTS",
-        "localhost"
+        ""
       )
     }
   };

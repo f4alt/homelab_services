@@ -41,15 +41,14 @@ test("time-since counts only completed 24-hour periods", () => {
   }
 });
 
-test("time-since formats singular and plural age phrases", () => {
-  const singular = getTimeSincePresentation(
+test("time-since presents a compact day token without an age phrase", () => {
+  const presentation = getTimeSincePresentation(
     trackedItem({ last_done: new Date(NOW_MS - DAY_MS).toISOString() }),
     NOW_MS
   );
-  const plural = getTimeSincePresentation(trackedItem(), NOW_MS);
 
-  assert.equal(singular.agePhrase, "1 day since");
-  assert.equal(plural.agePhrase, "0 days since");
+  assert.equal(presentation.ageToken, "1");
+  assert.equal(Object.hasOwn(presentation, "agePhrase"), false);
 });
 
 test("time-since treats missing and malformed completion timestamps as unknown", () => {
@@ -63,7 +62,6 @@ test("time-since treats missing and malformed completion timestamps as unknown",
 
     assert.equal(presentation.days, null);
     assert.equal(presentation.ageToken, "?");
-    assert.equal(presentation.agePhrase, "? days since");
     assert.equal(presentation.classification, "unknown");
   }
 });
@@ -76,7 +74,7 @@ test("time-since clamps future completion timestamps to zero elapsed", () => {
 
   assert.equal(presentation.elapsedMs, 0);
   assert.equal(presentation.days, 0);
-  assert.equal(presentation.agePhrase, "0 days since");
+  assert.equal(presentation.ageToken, "0");
 });
 
 test("time-since accepts thresholds in (0, 1] and defaults every other value", () => {

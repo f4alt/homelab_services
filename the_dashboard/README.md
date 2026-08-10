@@ -66,10 +66,11 @@ Important environment knobs are documented in `.env.example`, including:
 - `STATUS_PROBE_CONCURRENCY`
 - `STATUS_PROBE_ALLOWED_HOSTS`
 - `NETSTATS_PING_TARGET`
-- `SYSTEM_HEALTH_CONTAINER_API_URL`
 
-The default status-probe allowlist is intentionally minimal: `localhost`. Add
-LAN hosts or patterns locally only when a widget needs them.
+Status checks treat exact `localhost`, `127.0.0.1`, and `::1` targets as ports
+published by the Docker host while preserving those browser-facing URLs. Add
+LAN or external hosts and patterns to `STATUS_PROBE_ALLOWED_HOSTS` only when a
+widget needs them.
 
 Gateway uses the fixed internal Compose port `3000`. It is not published on the
 host; only Nginx's `DASHBOARD_HTTP_PORT` is host-facing. Gateway also runs the
@@ -84,7 +85,7 @@ setting to choose when a tracked activity changes from its normal age color to
 the warning color. Values must be greater than `0` and no more than `1`; the
 widget defaults invalid values to `0.8`.
 
-Set the `netstats` widget's `props.start_paused` option to `true` to show the
+Set the `netstats` widget's `props.startPaused` option to `true` to show the
 latency graph in its paused state without gathering latency samples until it is
 resumed. Public IP refreshes and manually started speed tests remain available.
 
@@ -155,33 +156,17 @@ The `home-assistant` widget keeps its long-lived access token in the Gateway's
 `HOME_ASSISTANT_TOKEN` environment variable. Its configured buttons accept only
 relative `/api/services/script/dashboard_*` action paths; expose only dedicated,
 low-consequence Home Assistant scripts that use the reserved `dashboard_`
-script ID prefix. `props.dashboardUrl` is a separate browser-reachable URL for
-opening the full Home Assistant dashboard.
+script ID prefix.
 
 The `system-health` widget reads CPU, memory, disk, temperature, and uptime from
-the Linux data already visible to the Gateway container. A dedicated
-`docker_socket_proxy` Compose service supplies container counts over an internal
-network. The proxy permits only `GET` and `HEAD` requests to Docker's container
-API; the Gateway never mounts the Docker socket. A read-only socket bind alone
-would not make Docker operations read-only. Override
-`SYSTEM_HEALTH_CONTAINER_API_URL` only when an equivalent restricted proxy is
-available elsewhere. The tile shows an attention state when a CPU temperature
-sensor or container proxy is unavailable.
-
-### Container-health security boundary
-
-The socket proxy is a deliberate platform exception to the usual widget touch
-points. Docker does not provide container state without daemon access, while a
-direct socket mount would give the larger Gateway process host-control
-capabilities. The dedicated proxy keeps that capability in a small internal
-service and rejects mutation and non-container API requests. Its policy is
-verified against the running Compose stack by
-`node tests/verify-container-proxy.mjs`.
+the Linux data already visible to the Gateway container. Its compact strip uses
+the normal neutral surface when readings are healthy and adds a warning or error
+border only when host telemetry needs attention.
 
 The dedicated `time-since` widget shows tracked Todo activities in backend
 order, provides local source-file filtering, colors only the elapsed-day value
 as a target approaches or passes, and records a completion through the existing
-Todo update route with its small `Done now` action.
+Todo update route when that clickable value is selected.
 
 ## Adding a Widget
 
@@ -208,7 +193,6 @@ In another terminal:
 
 ```sh
 node tests/smoke.mjs
-node tests/verify-container-proxy.mjs
 ```
 
 The smoke script saves the currently active config source through the editor

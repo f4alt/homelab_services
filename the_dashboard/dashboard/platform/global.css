@@ -8,7 +8,6 @@
   --card-border: #1d232d;
   --ok: #20c997;
   --ok-rgb: 32, 201, 151;
-  --ok-muted: #136b52;
   --warn: #ffc107;
   --warn-rgb: 255, 193, 7;
   --warn-muted: #7a5e12;
@@ -127,23 +126,32 @@ html,body {
 /***** consistent widget styling framework
  *
  */
-/* tiled lists - tiles fall into columns when content and real estate allow */
+/* tiled lists - children wrap and claim the available surface */
 .list-tiled {
-  --tile-min: 16rem;         /* minimum column width (override per widget) */
-  --tile-gap: var(--gap);    /* gap between tiles */
-  --tile-columns: auto-fit;  /* auto-fit | auto-fill | 1 | 2 | .. */
+  --tile-min: 16rem;
+  --tile-gap: var(--gap);
 
-  display: grid;
+  align-content: stretch;
+  align-items: stretch;
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
   gap: var(--tile-gap);
-  grid-template-columns: repeat(
-    var(--tile-columns),
-    minmax(min(100%, var(--tile-min)), 1fr)
-  );
+}
 
-  /* keep items aligned when heights differ */
-  align-items: start;
-  /* slightly better compaction when tiles vary in height */
-  grid-auto-flow: row dense;
+.list-tiled > * {
+  flex: 1 1 var(--tile-min);
+  min-width: min(100%, var(--tile-min));
+}
+
+.list-tiled--preferred-columns > * {
+  flex-basis: max(
+    var(--tile-min),
+    calc(
+      (100% - (var(--tile-column-gaps) * var(--tile-gap))) /
+        var(--tile-columns)
+    )
+  );
 }
 
 /* children take full width of parent and stack vertically */
@@ -283,10 +291,6 @@ html,body {
   white-space: nowrap;
 }
 
-.severity-ok {
-  border-color: var(--ok-muted) !important;
-}
-
 .severity-warn,
 .warn {
   border-color: var(--warn-muted) !important;
@@ -303,16 +307,29 @@ html,body {
   color: inherit;
   background: var(--bg);
   border: 1px solid var(--bg);
-  border-radius: var(--radius);
-  padding: var(--widget-padding);
+  border-radius: var(--clickable-radius, var(--radius));
+  padding: var(--clickable-padding, var(--widget-padding));
   transition: box-shadow .15s ease, border-color .15s ease;
-  box-shadow: 0 4px 24px rgba(var(--card-shadow), .2);
+  box-shadow: var(
+    --clickable-shadow,
+    0 4px 24px rgba(var(--card-shadow), .2)
+  );
   cursor: pointer;
 }
+
+.clickable--compact {
+  --clickable-padding: var(--space-xs) var(--space-sm);
+  --clickable-radius: var(--radius-compact);
+  --clickable-shadow: none;
+}
+
 .clickable:hover,
 .clickable:focus-visible {
   border-color: var(--clickable-hover-border);
-  box-shadow: 0 6px 24px rgba(var(--card-shadow), .35);
+  box-shadow: var(
+    --clickable-shadow,
+    0 6px 24px rgba(var(--card-shadow), .35)
+  );
 }
 
 button.clickable {

@@ -1,7 +1,6 @@
 import { readFile, readdir, statfs } from "node:fs/promises";
 import { join } from "node:path";
 import { Router } from "express";
-import { CONFIG } from "../platform/config.js";
 import { sendError, sendOk } from "../platform/responses.js";
 
 const CPU_SAMPLE_INTERVAL_MS = 100;
@@ -21,14 +20,7 @@ const MAX_CPU_TEMPERATURE_CELSIUS = 200;
 const MILLIDEGREES_PER_DEGREE = 1000;
 const MIN_CPU_TEMPERATURE_CELSIUS = -50;
 const KIBIBYTE_BYTES = 1024;
-const RECOGNIZED_CONTAINER_STATES = new Set([
-  "exited",
-  "paused",
-  "restarting",
-  "running"
-]);
 const PERCENT_SCALE = 100;
-const SYSTEM_HEALTH_UPSTREAM_TIMEOUT_MS = 5000;
 
 function roundToTenths(value) {
   return Math.round(value * 10) / 10;
@@ -157,55 +149,6 @@ async function readCpuTemperature({ hwmonRoot, readText, readdirImpl }) {
   }
 }
 
-async function readContainerHealth({
-  containerApiUrl,
-  fetchImpl,
-  signalForTimeout,
-  timeoutMs
-}) {
-  if (!containerApiUrl) return null;
-
-  try {
-    const baseUrl = `${String(containerApiUrl).replace(/\/+$/, "")}/`;
-    const url = new URL("containers/json?all=1", baseUrl);
-    const response = await fetchImpl(url, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      signal: signalForTimeout(timeoutMs)
-    });
-    if (!response.ok) return null;
-
-    const containers = await response.json();
-    if (!Array.isArray(containers)) return null;
-
-    return containers.reduce(
-      (summary, container) => {
-        const state = String(container?.State || "").toLowerCase();
-        const status = String(container?.Status || "").toLowerCase();
-        summary.total += 1;
-        if (state === "running") summary.running += 1;
-        if (state === "restarting") summary.restarting += 1;
-        if (state === "exited") summary.exited += 1;
-        if (state === "paused") summary.paused += 1;
-        if (!RECOGNIZED_CONTAINER_STATES.has(state)) summary.other += 1;
-        if (status.includes("(unhealthy)")) summary.unhealthy += 1;
-        return summary;
-      },
-      {
-        total: 0,
-        running: 0,
-        unhealthy: 0,
-        restarting: 0,
-        exited: 0,
-        paused: 0,
-        other: 0
-      }
-    );
-  } catch {
-    return null;
-  }
-}
-
 export function createSystemHealthCollector({
   procRoot = "/proc",
   sysRoot = "/sys",
@@ -213,10 +156,6 @@ export function createSystemHealthCollector({
   readFile: readFileImpl = readFile,
   readdir: readdirImpl = readdir,
   statfs: statfsImpl = statfs,
-  containerApiUrl = "",
-  containerTimeoutMs = SYSTEM_HEALTH_UPSTREAM_TIMEOUT_MS,
-  fetchImpl = fetch,
-  signalForTimeout = AbortSignal.timeout,
   delay = defaultDelay,
   now = () => new Date()
 } = {}) {
@@ -233,8 +172,7 @@ export function createSystemHealthCollector({
       memorySource,
       uptimeSource,
       diskStats,
-      temperature,
-      containers
+      temperature
     ] = await Promise.all([
       readText(join(procRoot, "stat")),
       readText(join(procRoot, "meminfo")),
@@ -244,12 +182,6 @@ export function createSystemHealthCollector({
         hwmonRoot: join(sysRoot, "class", "hwmon"),
         readText,
         readdirImpl
-      }),
-      readContainerHealth({
-        containerApiUrl,
-        fetchImpl,
-        signalForTimeout,
-        timeoutMs: containerTimeoutMs
       })
     ]);
     const cpu = cpuUsage(cpuBefore, parseCpuStat(cpuAfterSource));
@@ -263,8 +195,7 @@ export function createSystemHealthCollector({
       memory: parseMemory(memorySource),
       disk: { usedPercent: diskUsage(diskStats) },
       temperature,
-      uptimeSeconds: parseUptime(uptimeSource),
-      containers
+      uptimeSeconds: parseUptime(uptimeSource)
     };
   }
 
@@ -287,10 +218,7 @@ export function createSystemHealthHandler({ collectSnapshot }) {
 }
 
 const router = Router();
-const collector = createSystemHealthCollector({
-  containerApiUrl: CONFIG.systemHealth.containerApiUrl,
-  containerTimeoutMs: CONFIG.upstreamTimeoutMs
-});
+const collector = createSystemHealthCollector();
 
 router.get(
   "/system-health",

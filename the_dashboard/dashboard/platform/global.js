@@ -87,15 +87,25 @@ export function setStateMessage(container, message, state = "") {
   container.replaceChildren(createWidgetMessage(message));
 }
 
+function positiveInteger(value) {
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
 export function createResponsiveGrid(props = {}, className = "list-tiled") {
   const grid = createElement("div", className);
+  const tileColumns = positiveInteger(props?.tileColumns);
 
-  if (props?.tile_columns)
-    grid.style.setProperty("--tile-columns", props.tile_columns);
-  if (props?.tile_gap)
-    grid.style.setProperty("--tile-gap", `${props.tile_gap}px`);
-  if (props?.tile_minWidth)
-    grid.style.setProperty("--tile-min", `${props.tile_minWidth}px`);
+  if (tileColumns !== null) {
+    grid.classList.add("list-tiled--preferred-columns");
+    grid.style.setProperty("--tile-columns", String(tileColumns));
+    grid.style.setProperty("--tile-column-gaps", String(tileColumns - 1));
+  }
+  if (Number.isFinite(props?.tileGap) && props.tileGap >= 0) {
+    grid.style.setProperty("--tile-gap", `${props.tileGap}px`);
+  }
+  if (Number.isFinite(props?.tileMinWidth) && props.tileMinWidth > 0) {
+    grid.style.setProperty("--tile-min", `${props.tileMinWidth}px`);
+  }
 
   return grid;
 }

@@ -204,8 +204,6 @@ check("system health route returns core host readings", async () => {
   assert(Number.isFinite(json?.data?.memory?.usedPercent), "memory usage was unavailable");
   assert(Number.isFinite(json?.data?.disk?.usedPercent), "disk usage was unavailable");
   assert(Number.isFinite(json?.data?.uptimeSeconds), "uptime was unavailable");
-  assert(Number.isFinite(json?.data?.containers?.total), "container total was unavailable");
-  assert(Number.isFinite(json?.data?.containers?.running), "running count was unavailable");
   assert(typeof json?.data?.sampledAt === "string", "sample timestamp was unavailable");
 });
 
@@ -234,18 +232,20 @@ check("status route validates empty target list", async () => {
   assert(json?.error?.code === "validation_error", "empty statuschecks error code mismatch");
 });
 
-check("status route probes an allowed network target", async () => {
+check("status route probes a browser-facing dashboard host target", async () => {
+  const target = new URL("/config.js", `${baseUrl}/`).toString();
   const { response, json } = await request("/api/statuschecks", {
     method: "POST",
     body: JSON.stringify({
-      targets: [{ url: "localhost:3000/missing" }]
+      targets: [{ url: target }]
     })
   });
 
   assert(response.ok, `expected HTTP 2xx, got ${response.status}`);
   assert(json?.ok === true, "statuschecks response did not report ok=true");
   assert(json?.data?.results?.[0]?.ok === true, "allowed target was not reachable");
-  assert(json.data.results[0].status === 404, "unexpected allowed target status");
+  assert(json.data.results[0].status === 200, "unexpected allowed target status");
+  assert(json.data.results[0].final_url === target, "browser target URL was not preserved");
 });
 
 check("status route rejects disallowed target hosts", async () => {

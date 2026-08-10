@@ -24,26 +24,39 @@ const METRICS = Object.freeze([
   { key: "memory", label: "RAM" },
   { key: "disk", label: "Disk" },
   { key: "temperature", label: "Temp" },
-  { key: "uptime", label: "Uptime" },
-  { key: "containers", label: "Containers" }
+  { key: "uptime", label: "Uptime" }
 ]);
 const SYSTEM_HEALTH_STYLE_ID = "system-health-styles";
 
 const SYSTEM_HEALTH_STYLES = `
     .system-health-tile {
+      --system-health-metric-min: 6rem;
+
       display: flex;
-      flex-direction: column;
-      gap: var(--gap);
+      flex-wrap: wrap;
+      gap: var(--space-sm) var(--gap);
     }
 
     .system-health-metrics {
       display: grid;
-      gap: var(--gap);
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      flex: 1 1 100%;
+      gap: var(--space-sm) var(--gap);
+      grid-template-columns: repeat(
+        auto-fit,
+        minmax(min(100%, var(--system-health-metric-min)), 1fr)
+      );
     }
 
     .system-health-metric {
+      align-items: baseline;
+      display: flex;
+      gap: var(--space-xs);
+      justify-content: center;
       min-width: 0;
+    }
+
+    .system-health-warning {
+      flex: 1 1 100%;
     }
   `;
 
@@ -62,7 +75,6 @@ function threshold(value, fallback) {
 
 function normalizeProps(props) {
   const source = props && typeof props === "object" ? props : {};
-  const label = String(source.label || "").trim();
   const thresholds = Object.fromEntries(
     Object.entries(DEFAULT_THRESHOLDS).map(([name, fallback]) => [
       name,
@@ -71,7 +83,6 @@ function normalizeProps(props) {
   );
 
   return {
-    label: label || "System",
     staleAfterMs: threshold(source.staleAfterMs, DEFAULT_STALE_AFTER_MS),
     thresholds
   };
@@ -98,12 +109,6 @@ function formatUptime(value) {
   return `${Math.floor(seconds / MINUTE_SECONDS)}m`;
 }
 
-function formatContainers(containers) {
-  const running = finiteNumber(containers?.running);
-  const total = finiteNumber(containers?.total);
-  return running === null || total === null ? "—" : `${running}/${total}`;
-}
-
 function requiredSnapshotValuesArePresent(snapshot) {
   return snapshot
     && finiteNumber(snapshot.cpu?.usagePercent) !== null
@@ -112,13 +117,8 @@ function requiredSnapshotValuesArePresent(snapshot) {
     && finiteNumber(snapshot.uptimeSeconds) !== null;
 }
 
-function pluralized(count, singular) {
-  return `${count} ${singular}${count === 1 ? "" : "s"}`;
-}
-
 function evaluateSnapshot(snapshot, props) {
   const warnings = [];
-  let severity = "ok";
   const thresholds = props.thresholds;
   const cpuUsage = finiteNumber(snapshot.cpu?.usagePercent);
   const memoryUsage = finiteNumber(snapshot.memory?.usedPercent);
@@ -142,34 +142,6 @@ function evaluateSnapshot(snapshot, props) {
     warnings.push("Swap in use");
   }
 
-  const containers = snapshot.containers;
-  if (!containers) {
-    warnings.push("Container health unavailable");
-  } else {
-    const unhealthy = Math.max(0, finiteNumber(containers.unhealthy) || 0);
-    const restarting = Math.max(0, finiteNumber(containers.restarting) || 0);
-    const exited = Math.max(0, finiteNumber(containers.exited) || 0);
-    const paused = Math.max(0, finiteNumber(containers.paused) || 0);
-    const other = Math.max(0, finiteNumber(containers.other) || 0);
-
-    if (unhealthy > 0) {
-      warnings.push(`${pluralized(unhealthy, "container")} unhealthy`);
-      severity = "error";
-    }
-    if (restarting > 0) {
-      warnings.push(`${pluralized(restarting, "container")} restarting`);
-    }
-    if (exited > 0) {
-      warnings.push(`${pluralized(exited, "container")} exited`);
-      severity = "error";
-    }
-    if (paused > 0) warnings.push(`${pluralized(paused, "container")} paused`);
-    if (other > 0) {
-      warnings.push(`${pluralized(other, "container")} not running`);
-      severity = "error";
-    }
-  }
-
   const sampledAt = Date.parse(snapshot.sampledAt);
   if (!Number.isFinite(sampledAt)) {
     warnings.push("Telemetry timestamp unavailable");
@@ -177,20 +149,12 @@ function evaluateSnapshot(snapshot, props) {
     warnings.push("Telemetry is stale");
   }
 
-  if (warnings.length > 0 && severity === "ok") severity = "warn";
-  return { severity, warnings };
+  return warnings;
 }
 
 function setSeverity(state, severity) {
-  state.severity = severity;
-  state.tile.classList.remove("severity-ok", "severity-warn", "severity-error");
-  state.tile.classList.add(`severity-${severity}`);
-  state.dot.className = `dot dot--${severity === "error" ? "err" : severity}`;
-  state.status.textContent = severity === "ok"
-    ? "Healthy"
-    : severity === "error"
-      ? "Unhealthy"
-      : "Attention";
+  state.tile.classList.remove("severity-warn", "severity-error");
+  if (severity) state.tile.classList.add(`severity-${severity}`);
 }
 
 function renderSnapshot(state, snapshot) {
@@ -205,10 +169,9 @@ function renderSnapshot(state, snapshot) {
     ? "—"
     : `${formatNumber(temperature)}°C`;
   state.values.uptime.textContent = formatUptime(snapshot.uptimeSeconds);
-  state.values.containers.textContent = formatContainers(snapshot.containers);
 
-  const { severity, warnings } = evaluateSnapshot(snapshot, state.props);
-  setSeverity(state, severity);
+  const warnings = evaluateSnapshot(snapshot, state.props);
+  setSeverity(state, warnings.length > 0 ? "warn" : "");
   state.snapshotWarnings = warnings;
   state.warning.textContent = warnings.join(" · ");
   state.hasSnapshot = true;
@@ -221,7 +184,7 @@ function showRefreshFailure(state, message) {
   }
 
   const refreshWarning = `${message} Showing the previous snapshot.`;
-  setSeverity(state, state.severity === "error" ? "error" : "warn");
+  setSeverity(state, "error");
   state.warning.textContent = [...state.snapshotWarnings, refreshWarning].join(" · ");
 }
 
@@ -231,18 +194,9 @@ window.DASH.registerWidget("system-health", {
 
     const normalizedProps = normalizeProps(props);
     const grid = createResponsiveGrid(props);
-    const tile = createTile("system-health-tile");
-    const header = createElement("div", "widget-header");
-    const title = createElement("div", "label", normalizedProps.label);
-    const summary = createElement("div", "ui-row");
-    const dot = createElement("span", "dot dot--warn");
-    const status = createElement("span", "label-info system-health-state", "Loading");
+    const tile = createTile("ui-tile--compact system-health-tile");
     const metrics = createElement("dl", "system-health-metrics");
     const values = {};
-
-    dot.setAttribute("aria-hidden", "true");
-    summary.append(dot, status);
-    header.append(title, summary);
 
     for (const metric of METRICS) {
       const field = createElement("div", "system-health-metric");
@@ -259,20 +213,17 @@ window.DASH.registerWidget("system-health", {
     );
     warning.setAttribute("aria-live", "polite");
     warning.setAttribute("role", "status");
-    tile.append(header, metrics, warning);
+    tile.append(metrics, warning);
 
     root.replaceChildren(grid);
     setStateMessage(grid, "Loading system health…", "loading");
 
     return {
       aborter: null,
-      dot,
       grid,
       hasSnapshot: false,
       props: normalizedProps,
-      severity: "warn",
       snapshotWarnings: [],
-      status,
       tile,
       values,
       warning

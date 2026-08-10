@@ -78,7 +78,7 @@ test("netstats starts paused when configured and prevents overlapping work", asy
           ipRefreshMs: 1000,
           pingIntervalMs: 1000,
           maxSamples: 5,
-          start_paused: true
+          startPaused: true
         }
       });
       await registration.implementation.update(instance);

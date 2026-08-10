@@ -74,6 +74,51 @@ test("shared widget styles are installed once per document", async () => {
   });
 });
 
+test("responsive grids accept only camelCase layout props", async () => {
+  const camelCaseProperties = new Map();
+  const legacyProperties = new Map();
+  const createDocument = (properties) => ({
+    createElement(tagName) {
+      const element = new FakeElement(tagName);
+      element.style = {
+        setProperty(name, value) {
+          properties.set(name, String(value));
+        }
+      };
+      return element;
+    }
+  });
+
+  const { createResponsiveGrid } = await import(
+    `../dashboard/platform/global.js?responsive-grid=${Date.now()}`
+  );
+
+  let configuredGrid;
+  await withPatchedGlobals({ document: createDocument(camelCaseProperties) }, async () => {
+    configuredGrid = createResponsiveGrid({
+      tileColumns: 2,
+      tileGap: 0,
+      tileMinWidth: 180
+    });
+  });
+  await withPatchedGlobals({ document: createDocument(legacyProperties) }, async () => {
+    createResponsiveGrid({
+      tile_columns: 3,
+      tile_gap: 12,
+      tile_minWidth: 240
+    });
+  });
+
+  assert.deepEqual(Object.fromEntries(camelCaseProperties), {
+    "--tile-column-gaps": "1",
+    "--tile-columns": "2",
+    "--tile-gap": "0px",
+    "--tile-min": "180px"
+  });
+  assert.equal(configuredGrid.classList.contains("list-tiled--preferred-columns"), true);
+  assert.deepEqual(Object.fromEntries(legacyProperties), {});
+});
+
 test("Search registers as a static widget without a no-op update", async () => {
   let registration;
   await withPatchedGlobals({

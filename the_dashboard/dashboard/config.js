@@ -36,7 +36,7 @@ window.DASH_CONFIG = {
       width: 1,
       refreshMs: 0,
       props: {
-        tile_minWidth: 200,
+        tileMinWidth: 200,
         zones: [
           { label: "Local", tz: "local" },
           { label: "UTC", tz: "UTC" },
@@ -66,7 +66,7 @@ window.DASH_CONFIG = {
       width: 1,
       refreshMs: 30000,
       props: {
-        tile_minWidth: 220,
+        tileMinWidth: 220,
         services: []
       }
     },
@@ -111,7 +111,6 @@ window.DASH_CONFIG = {
       width: "all",
       refreshMs: 0,
       props: {
-        dashboardUrl: "",
         buttons: []
       }
     },

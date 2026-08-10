@@ -51,7 +51,7 @@ async function withTimeSinceWidget(fetchImplementation, run) {
   });
 }
 
-test("time-since registers and defaults to an ordered aggregate view", async () => {
+test("time-since renders ordered tiles inside a height-capped responsive grid", async () => {
   const requests = [];
   const items = [
     {
@@ -79,15 +79,19 @@ test("time-since registers and defaults to an ordered aggregate view", async () 
 
     await registration.implementation.update(state);
 
+    const scroll = findByClass(root, "list-scroll");
     assert.equal(registration.type, "time-since");
     assert.equal(state.currentSource.textContent, "All");
-    assert.equal(state.list.classList.contains("list-scroll"), true);
+    assert.equal(scroll !== null, true);
+    assert.equal(scroll.children[0], state.grid);
+    assert.equal(state.grid.classList.contains("list-tiled"), true);
     assert.deepEqual(
-      state.list.children.map((row) => findByClass(row, "time-since-name").textContent),
+      state.grid.children.map((tile) => findByClass(tile, "time-since-name").textContent),
       ["Change the AC filter", "Test the backup restore"]
     );
-    assert.equal(treeText(state.list).includes("home.org"), false);
-    assert.equal(treeText(state.list).includes("homelab.org"), false);
+    assert.equal(state.grid.children.every((tile) => tile.classList.contains("ui-tile")), true);
+    assert.equal(treeText(state.grid).includes("home.org"), false);
+    assert.equal(treeText(state.grid).includes("homelab.org"), false);
     assert.deepEqual(requests, ["/api/todos/time-since"]);
   });
 });
@@ -122,7 +126,7 @@ test("time-since source filtering is local", async () => {
 
     assert.equal(state.currentSource.textContent, "homelab.org");
     assert.deepEqual(
-      state.list.children.map((row) => findByClass(row, "time-since-name").textContent),
+      state.grid.children.map((tile) => findByClass(tile, "time-since-name").textContent),
       ["Homelab activity"]
     );
     assert.equal(requestCount, 1);
@@ -136,13 +140,13 @@ test("time-since uses the shared empty state for an empty collection", async () 
       const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
       await registration.implementation.update(state);
 
-      assert.equal(state.list.classList.contains("is-empty"), true);
-      assert.equal(state.list.children[0].textContent, "No tracked activities found.");
+      assert.equal(state.grid.classList.contains("is-empty"), true);
+      assert.equal(state.grid.children[0].textContent, "No tracked activities found.");
     }
   );
 });
 
-test("time-since colors only the age token and renders unknown ages", async () => {
+test("time-since day buttons reset from above the task name and expose a shared popup", async () => {
   const approachingTimestamp = new Date(Date.now() - (8 * DAY_MS)).toISOString();
   const items = [
     {
@@ -169,25 +173,38 @@ test("time-since colors only the age token and renders unknown ages", async () =
       });
       await registration.implementation.update(state);
 
-      const knownRow = state.list.children[0];
-      const knownToken = findByClass(knownRow, "time-since-age-token");
-      const knownAge = findByClass(knownRow, "time-since-age");
-      const unknownRow = state.list.children[1];
-      const unknownToken = findByClass(unknownRow, "time-since-age-token");
+      const knownTile = state.grid.children[0];
+      const knownButton = findByClass(knownTile, "time-since-reset-button");
+      const knownName = findByClass(knownTile, "time-since-name");
+      const popup = findByClass(knownTile, "time-since-tooltip");
+      const unknownButton = findByClass(
+        state.grid.children[1],
+        "time-since-reset-button"
+      );
 
-      assert.equal(knownToken.textContent, "8");
-      assert.equal(knownToken.classList.contains("time-since-age-token--approaching"), true);
-      assert.equal(knownAge.classList.contains("time-since-age-token--approaching"), false);
-      assert.equal(knownRow.classList.contains("time-since-age-token--approaching"), false);
-      assert.match(treeText(knownAge), /8\s+days since/);
-      assert.equal(unknownToken.textContent, "?");
-      assert.equal(unknownToken.classList.contains("time-since-age-token--unknown"), true);
-      assert.match(treeText(unknownRow), /\?\s+days since/);
+      assert.equal(knownTile.children[0], knownButton);
+      assert.equal(knownTile.children[1], knownName);
+      assert.equal(knownButton.tagName, "button");
+      assert.equal(knownButton.textContent, "8");
+      assert.equal(knownButton.classList.contains("clickable"), true);
+      assert.equal(knownButton.classList.contains("clickable--compact"), true);
+      assert.equal(
+        knownButton.classList.contains("time-since-age-token--approaching"),
+        true
+      );
+      assert.match(knownButton.getAttribute("aria-label"), /^Reset days for Known activity\./);
+      assert.equal(popup.classList.contains("popup"), true);
+      assert.equal(popup.getAttribute("role"), "tooltip");
+      assert.match(popup.textContent, /Last done: .* · Target: 10 days · Approaching/);
+      assert.equal(unknownButton.textContent, "?");
+      assert.equal(unknownButton.classList.contains("time-since-age-token--unknown"), true);
+      assert.equal(treeText(state.grid).includes("Done now"), false);
+      assert.equal(treeText(state.grid).includes("days since"), false);
     }
   );
 });
 
-test("Done now posts the existing update contract, renders zero optimistically, and reloads", async () => {
+test("resetting the day number posts the existing update contract and reloads", async () => {
   const postResponse = createDeferred();
   const originalTimestamp = new Date(Date.now() - (5 * DAY_MS)).toISOString();
   const authoritativeTimestamp = new Date(Date.now() - DAY_MS).toISOString();
@@ -211,15 +228,14 @@ test("Done now posts the existing update contract, renders zero optimistically, 
   }, async ({ registration }) => {
     const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
     await registration.implementation.update(state);
-    const originalButton = findByClass(state.list.children[0], "time-since-done-button");
+    const originalButton = findByClass(state.grid.children[0], "time-since-reset-button");
 
     const action = originalButton.fireAsync("click");
-    const optimisticButton = findByClass(state.list.children[0], "time-since-done-button");
-    const optimisticToken = findByClass(state.list.children[0], "time-since-age-token");
+    const optimisticButton = findByClass(state.grid.children[0], "time-since-reset-button");
 
     assert.equal(originalButton.disabled, true);
     assert.equal(optimisticButton.disabled, true);
-    assert.equal(optimisticToken.textContent, "0");
+    assert.equal(optimisticButton.textContent, "0");
     assert.equal(requests[1].url, "/api/todos/tasks/update");
     assert.equal(requests[1].options.method, "POST");
     assert.deepEqual(JSON.parse(requests[1].options.body), {
@@ -232,11 +248,14 @@ test("Done now posts the existing update contract, renders zero optimistically, 
 
     assert.equal(getCount, 2);
     assert.equal(state.items[0].last_done, authoritativeTimestamp);
-    assert.equal(findByClass(state.list.children[0], "time-since-done-button").disabled, false);
+    assert.equal(
+      findByClass(state.grid.children[0], "time-since-reset-button").disabled,
+      false
+    );
   });
 });
 
-test("Done now restores the prior item and shows the shared error state on failure", async () => {
+test("a failed day reset restores the prior item and shows the shared error state", async () => {
   const originalTimestamp = new Date(Date.now() - (5 * DAY_MS)).toISOString();
   let getCount = 0;
 
@@ -259,17 +278,17 @@ test("Done now restores the prior item and shows the shared error state on failu
     const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
     await registration.implementation.update(state);
 
-    await findByClass(state.list.children[0], "time-since-done-button").fireAsync("click");
+    await findByClass(state.grid.children[0], "time-since-reset-button").fireAsync("click");
 
     assert.equal(getCount, 1);
     assert.equal(state.items[0].last_done, originalTimestamp);
     assert.equal(state.pendingCompletions.size, 0);
-    assert.equal(state.list.classList.contains("is-error"), true);
-    assert.equal(state.list.children[0].textContent, "Unable to update todo.");
+    assert.equal(state.grid.classList.contains("is-error"), true);
+    assert.equal(state.grid.children[0].textContent, "Unable to update todo.");
   });
 });
 
-test("Done now retains the optimistic completion when only the authoritative reload fails", async () => {
+test("a day reset retains its optimistic completion when only the reload fails", async () => {
   const originalTimestamp = new Date(Date.now() - (5 * DAY_MS)).toISOString();
   let getCount = 0;
 
@@ -293,16 +312,16 @@ test("Done now retains the optimistic completion when only the authoritative rel
     const state = registration.implementation.mount(new FakeElement("section"), { props: {} });
     await registration.implementation.update(state);
 
-    await findByClass(state.list.children[0], "time-since-done-button").fireAsync("click");
+    await findByClass(state.grid.children[0], "time-since-reset-button").fireAsync("click");
 
     assert.notEqual(state.items[0].last_done, originalTimestamp);
     assert.equal(state.pendingCompletions.size, 0);
-    assert.equal(state.list.classList.contains("is-error"), true);
-    assert.equal(state.list.children[0].textContent, "Authoritative reload failed.");
+    assert.equal(state.grid.classList.contains("is-error"), true);
+    assert.equal(state.grid.children[0].textContent, "Authoritative reload failed.");
   });
 });
 
-test("overlapping Done now actions keep optimistic and authoritative state isolated by UID", async () => {
+test("overlapping day resets keep optimistic and authoritative state isolated by UID", async () => {
   const firstPost = createDeferred();
   const secondPost = createDeferred();
   const originalTimestamp = new Date(Date.now() - (5 * DAY_MS)).toISOString();
@@ -339,19 +358,19 @@ test("overlapping Done now actions keep optimistic and authoritative state isola
     await registration.implementation.update(state);
 
     const firstAction = findByClass(
-      state.list.children[0],
-      "time-since-done-button"
+      state.grid.children[0],
+      "time-since-reset-button"
     ).fireAsync("click");
     const secondAction = findByClass(
-      state.list.children[1],
-      "time-since-done-button"
+      state.grid.children[1],
+      "time-since-reset-button"
     ).fireAsync("click");
 
     firstPost.resolve(createSuccessResponse({ task: { uid: "first", status: "TODO" } }));
     await firstAction;
 
     assert.equal(
-      findByClass(state.list.children[1], "time-since-age-token").textContent,
+      findByClass(state.grid.children[1], "time-since-reset-button").textContent,
       "0"
     );
 
@@ -364,7 +383,7 @@ test("overlapping Done now actions keep optimistic and authoritative state isola
   });
 });
 
-test("unchanged refreshes reuse source choices, rows, and row handlers", async () => {
+test("unchanged refreshes reuse source choices, tiles, and reset handlers", async () => {
   const item = {
     uid: "filter",
     name: "Change the AC filter",
@@ -380,16 +399,19 @@ test("unchanged refreshes reuse source choices, rows, and row handlers", async (
       await registration.implementation.update(state);
       const allChoice = state.menu.children[0];
       const sourceChoice = state.menu.children[1];
-      const row = state.list.children[0];
-      const doneButton = findByClass(row, "time-since-done-button");
+      const tile = state.grid.children[0];
+      const resetButton = findByClass(tile, "time-since-reset-button");
 
       await registration.implementation.update(state);
 
       assert.equal(state.menu.children[0], allChoice);
       assert.equal(state.menu.children[1], sourceChoice);
-      assert.equal(state.list.children[0], row);
-      assert.equal(findByClass(state.list.children[0], "time-since-done-button"), doneButton);
-      assert.equal(doneButton.events.get("click").size, 1);
+      assert.equal(state.grid.children[0], tile);
+      assert.equal(
+        findByClass(state.grid.children[0], "time-since-reset-button"),
+        resetButton
+      );
+      assert.equal(resetButton.events.get("click").size, 1);
     }
   );
 });
@@ -490,9 +512,9 @@ test("two time-since instances keep their source filters independent", async () 
       firstState.menu.children[2].fire("click");
 
       assert.equal(firstState.currentSource.textContent, "homelab.org");
-      assert.equal(firstState.list.children.length, 1);
+      assert.equal(firstState.grid.children.length, 1);
       assert.equal(secondState.currentSource.textContent, "All");
-      assert.equal(secondState.list.children.length, 2);
+      assert.equal(secondState.grid.children.length, 2);
       assert.notEqual(firstState.pendingCompletions, secondState.pendingCompletions);
     }
   );

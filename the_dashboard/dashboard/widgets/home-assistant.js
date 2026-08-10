@@ -6,21 +6,6 @@ import {
   fetchJson
 } from "../platform/global.js";
 
-function normalizeDashboardUrl(value) {
-  if (typeof value !== "string") return "";
-  const dashboardUrl = value.trim();
-  if (!dashboardUrl) return "";
-
-  try {
-    const url = new URL(dashboardUrl);
-    return url.protocol === "http:" || url.protocol === "https:"
-      ? dashboardUrl
-      : "";
-  } catch {
-    return "";
-  }
-}
-
 function isPlainObject(value) {
   if (!value || typeof value !== "object") return false;
   const prototype = Object.getPrototypeOf(value);
@@ -76,24 +61,6 @@ window.DASH.registerWidget("home-assistant", {
     const shell = createStack();
     shell.classList.add("widget-body");
 
-    const dashboardAction = createElement("div", "widget-header");
-    const dashboardUrl = normalizeDashboardUrl(props.dashboardUrl);
-    if (dashboardUrl) {
-      const dashboardLink = createElement(
-        "a",
-        "clickable",
-        "Open Home Assistant"
-      );
-      dashboardLink.href = dashboardUrl;
-      dashboardLink.target = "_blank";
-      dashboardLink.rel = "noopener noreferrer";
-      dashboardAction.appendChild(dashboardLink);
-    } else {
-      dashboardAction.appendChild(
-        createWidgetMessage("Home Assistant dashboard URL is not configured.")
-      );
-    }
-
     const status = createWidgetMessage("", "widget-status");
     status.setAttribute("aria-live", "polite");
     const actions = createResponsiveGrid(props);
@@ -107,7 +74,7 @@ window.DASH.registerWidget("home-assistant", {
       );
     }
 
-    shell.append(dashboardAction, actions, status);
+    shell.append(actions, status);
     root.replaceChildren(shell);
   }
 });

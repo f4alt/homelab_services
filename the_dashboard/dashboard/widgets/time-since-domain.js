@@ -96,7 +96,6 @@ export function getTimeSincePresentation(item, nowMs, approachingRatio) {
     return {
       days: null,
       ageToken: "?",
-      agePhrase: "? days since",
       classification: CLASSIFICATION.UNKNOWN,
       elapsedMs: null,
       lastDone: null,
@@ -117,7 +116,6 @@ export function getTimeSincePresentation(item, nowMs, approachingRatio) {
     days,
     elapsedMs,
     ageToken: String(days),
-    agePhrase: `${days} ${days === 1 ? "day" : "days"} since`,
     classification,
     lastDone: item.last_done,
     targetDays,

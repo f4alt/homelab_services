@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { Router } from "express";
-import { CONFIG, hostIsAllowed } from "../platform/config.js";
+import { CONFIG, hostIsAllowed, hostIsLocal } from "../platform/config.js";
 import { errorMessage, sendError, sendOk } from "../platform/responses.js";
 
 const router = Router();
@@ -15,7 +15,7 @@ function allowedPingTarget(raw) {
   if (!value || /[\s/@]/.test(value)) {
     return false;
   }
-  return hostIsAllowed(value, CONFIG.statusProbe.allowedHosts);
+  return hostIsLocal(value) || hostIsAllowed(value, CONFIG.statusProbe.allowedHosts);
 }
 
 function pingOnce(target) {
