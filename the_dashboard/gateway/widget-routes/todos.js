@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { CONFIG } from "../platform/config.js";
-import { sendError, sendOk } from "../platform/responses.js";
+import { errorMessage, sendError, sendOk } from "../platform/responses.js";
 
 const router = Router();
 const VALID_STATUSES = new Set(["TODO", "DONE"]);
@@ -9,13 +9,13 @@ export function normalizeTimeSincePayload(payload) {
   return { items: Array.isArray(payload?.items) ? payload.items : [] };
 }
 
-async function fetchTodo(path, options = {}) {
-  const response = await fetch(new URL(path, CONFIG.todoBaseUrl), {
-    ...options,
+async function fetchTodo(upstreamPath, requestOptions = {}) {
+  const response = await fetch(new URL(upstreamPath, CONFIG.todoBaseUrl), {
+    ...requestOptions,
     headers: {
       Accept: "application/json",
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(options.headers || {})
+      ...(requestOptions.body ? { "Content-Type": "application/json" } : {}),
+      ...(requestOptions.headers || {})
     },
     signal: AbortSignal.timeout(CONFIG.upstreamTimeoutMs)
   });
@@ -32,51 +32,56 @@ async function fetchTodo(path, options = {}) {
   return payload;
 }
 
-function sendUpstreamError(res, err, message) {
+function sendUpstreamError(res, error, message) {
   return sendError(res, 502, "todo_upstream_error", message, {
-    status: err?.status,
-    error: String(err?.message || err),
-    upstream: err?.payload || null
+    status: error?.status,
+    error: errorMessage(error),
+    upstream: error?.payload || null
   });
 }
 
-router.get("/todos/health", async (_req, res) => {
-  try {
-    const payload = await fetchTodo("/health");
-    return sendOk(res, payload);
-  } catch (err) {
-    return sendUpstreamError(res, err, "Todo server healthcheck failed.");
-  }
-});
-
-router.get("/todos/tasks", async (_req, res) => {
-  try {
-    const payload = await fetchTodo("/tasks");
-    return sendOk(res, { tasks: Array.isArray(payload?.tasks) ? payload.tasks : [] });
-  } catch (err) {
-    return sendUpstreamError(res, err, "Unable to load todos.");
-  }
-});
-
-export async function getTimeSince(_req, res) {
-  try {
-    const payload = await fetchTodo("/time-since");
-    return sendOk(res, normalizeTimeSincePayload(payload));
-  } catch (err) {
-    return sendUpstreamError(res, err, "Unable to load time-since activities.");
-  }
+function createTodoProxyHandler({
+  upstreamPath,
+  failureMessage,
+  requestOptions,
+  normalizePayload = (payload) => payload
+}) {
+  return async function todoProxyHandler(_req, res) {
+    try {
+      const payload = await fetchTodo(upstreamPath, requestOptions);
+      return sendOk(res, normalizePayload(payload));
+    } catch (error) {
+      return sendUpstreamError(res, error, failureMessage);
+    }
+  };
 }
+
+router.get("/todos/health", createTodoProxyHandler({
+  upstreamPath: "/health",
+  failureMessage: "Todo server healthcheck failed."
+}));
+
+router.get("/todos/tasks", createTodoProxyHandler({
+  upstreamPath: "/tasks",
+  failureMessage: "Unable to load todos.",
+  normalizePayload: (payload) => ({
+    tasks: Array.isArray(payload?.tasks) ? payload.tasks : []
+  })
+}));
+
+export const getTimeSince = createTodoProxyHandler({
+  upstreamPath: "/time-since",
+  failureMessage: "Unable to load time-since activities.",
+  normalizePayload: normalizeTimeSincePayload
+});
 
 router.get("/todos/time-since", getTimeSince);
 
-router.post("/todos/sync", async (_req, res) => {
-  try {
-    const payload = await fetchTodo("/sync", { method: "POST" });
-    return sendOk(res, payload);
-  } catch (err) {
-    return sendUpstreamError(res, err, "Unable to sync todos.");
-  }
-});
+router.post("/todos/sync", createTodoProxyHandler({
+  upstreamPath: "/sync",
+  failureMessage: "Unable to sync todos.",
+  requestOptions: { method: "POST" }
+}));
 
 router.post("/todos/tasks/update", async (req, res) => {
   const { uid, content, source_file, status } = req.body || {};
@@ -94,8 +99,8 @@ router.post("/todos/tasks/update", async (req, res) => {
       body: JSON.stringify({ uid, content, source_file, status })
     });
     return sendOk(res, payload);
-  } catch (err) {
-    return sendUpstreamError(res, err, "Unable to update todo.");
+  } catch (error) {
+    return sendUpstreamError(res, error, "Unable to update todo.");
   }
 });
 
