@@ -28,6 +28,7 @@ export class FakeElement {
     this.attributes = new Map();
     this.children = [];
     this.classList = new FakeClassList();
+    this.dataset = {};
     this.events = new Map();
     this.focusCalls = 0;
     this.style = { setProperty() {} };
@@ -42,6 +43,10 @@ export class FakeElement {
 
   get className() {
     return [...this.classList.values].join(" ");
+  }
+
+  get firstChild() {
+    return this.children[0] || null;
   }
 
   addEventListener(type, listener) {
@@ -109,8 +114,18 @@ export class FakeElement {
   }
 
   replaceChildren(...children) {
+    for (const child of this.children) child.parentElement = null;
     this.children = [];
     this.append(...children);
+  }
+
+  removeChild(child) {
+    const index = this.children.indexOf(child);
+    if (index >= 0) {
+      this.children.splice(index, 1);
+      child.parentElement = null;
+    }
+    return child;
   }
 }
 
@@ -159,4 +174,19 @@ export class FakeDocument {
 
 export function treeText(element) {
   return [element.textContent, ...element.children.map(treeText)].join(" ");
+}
+
+export function findAll(element, predicate) {
+  const matches = predicate(element) ? [element] : [];
+  for (const child of element.children) {
+    matches.push(...findAll(child, predicate));
+  }
+  return matches;
+}
+
+export function findByClass(element, className) {
+  return findAll(
+    element,
+    (candidate) => candidate.classList.contains(className)
+  )[0] || null;
 }
