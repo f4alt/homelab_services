@@ -5,6 +5,5 @@ window.DASH.registerWidget("text", {
     const body = createElement("div", "widget-body label-info");
     body.textContent = props.text ?? "";
     root.replaceChildren(body);
-    return { body, props };
   }
 });
