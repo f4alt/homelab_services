@@ -2,6 +2,7 @@ import {
   createDismissibleMenu,
   createElement,
   fetchJson,
+  installWidgetStyles,
   setStateMessage
 } from "../platform/global.js";
 import {
@@ -12,17 +13,9 @@ import {
 
 const ALL_SOURCES = "";
 const ALL_SOURCES_LABEL = "All";
+const TIME_SINCE_STYLE_ID = "time-since-widget-styles";
 
-function ensureStyles() {
-  if (document.getElementById("time-since-widget-styles")) return;
-
-  const styles = document.createElement("style");
-  styles.id = "time-since-widget-styles";
-  styles.textContent = `
-    .time-since-source-button {
-      border-radius: var(--radius);
-    }
-
+const TIME_SINCE_STYLES = `
     .time-since-row {
       display: grid;
       gap: var(--gap);
@@ -64,8 +57,6 @@ function ensureStyles() {
       cursor: wait;
     }
   `;
-  document.head.appendChild(styles);
-}
 
 function availableSources(items) {
   return [...new Set(items.map((item) => item.source_file))];
@@ -121,7 +112,7 @@ function createRow(state, item) {
 
   row.append(name, age, doneButton);
   const rowView = { row, name, ageToken, ageUnit, doneButton, item };
-  doneButton.addEventListener("click", () => completeNow(state, rowView.item, doneButton));
+  doneButton.addEventListener("click", () => completeNow(state, rowView.item));
   updateRow(state, rowView, item);
   return rowView;
 }
@@ -237,11 +228,10 @@ function showCompletionError(state, error, fallbackMessage) {
   );
 }
 
-async function completeNow(state, item, button) {
+async function completeNow(state, item) {
   if (state.pendingCompletions.has(item.uid)) return;
 
   const previousIndex = state.items.findIndex((currentItem) => currentItem.uid === item.uid);
-  button.disabled = true;
   state.pendingCompletions.set(item.uid, {
     optimisticLastDone: new Date().toISOString(),
     previousIndex,
@@ -294,7 +284,7 @@ async function completeNow(state, item, button) {
 
 window.DASH.registerWidget("time-since", {
   mount(root, { props = {} }) {
-    ensureStyles();
+    installWidgetStyles(TIME_SINCE_STYLE_ID, TIME_SINCE_STYLES);
 
     const shell = createElement("div", "widget-body time-since-widget");
     const header = createElement("div", "widget-header");

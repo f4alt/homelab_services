@@ -94,7 +94,7 @@ window.DASH.registerWidget("home-assistant", {
       );
     }
 
-    const status = createWidgetMessage("");
+    const status = createWidgetMessage("", "widget-status");
     status.setAttribute("aria-live", "polite");
     const actions = createResponsiveGrid(props);
     const configuredActions = normalizeButtons(props.buttons);
