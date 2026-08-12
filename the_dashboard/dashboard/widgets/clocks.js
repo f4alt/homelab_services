@@ -9,6 +9,7 @@ const CLOCK_STYLE_ID = "clocks-widget-styles";
 const CLOCK_TICK_INTERVAL_MS = 1_000;
 const CLOCK_STYLES = `
     .clock-tile {
+      align-content: center;
       display: grid;
       grid-template-columns: 1fr auto;
     }
@@ -67,7 +68,7 @@ window.DASH.registerWidget("clocks", {
   mount(root, { props = {} }) {
     installWidgetStyles(CLOCK_STYLE_ID, CLOCK_STYLES);
 
-    const grid = createResponsiveGrid(props);
+    const grid = createResponsiveGrid(props, "list-tiled list-tiled--fill");
     root.replaceChildren(grid);
 
     const zones = Array.isArray(props?.zones) ? props.zones : [];

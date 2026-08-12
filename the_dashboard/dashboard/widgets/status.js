@@ -50,7 +50,7 @@ window.DASH.registerWidget("status", {
     if (!services.length) {
       setStateMessage(grid, "No status checks configured.", "empty");
     }
-    const tilesByUrl = new Map();
+    const tiles = [];
 
     for (const service of services) {
       const link = document.createElement("a");
@@ -83,14 +83,14 @@ window.DASH.registerWidget("status", {
       tile.append(dotWrap, iconBox, name);
       link.appendChild(tile);
       grid.appendChild(link);
-      tilesByUrl.set(service.url, { service, dot, link, popup });
+      tiles.push({ service, dot, link, popup });
     }
 
-    return { services, tilesByUrl, aborter: null };
+    return { services, tiles, aborter: null };
   },
 
   async update(state) {
-    const { services, tilesByUrl } = state;
+    const { services, tiles } = state;
     if (!services.length) return;
 
     state.aborter?.abort();
@@ -102,7 +102,7 @@ window.DASH.registerWidget("status", {
       if (state.aborter !== aborter || aborter.signal.aborted) return;
 
       const resultsByTarget = new Map(results.map((result) => [result.target, result]));
-      for (const { service, dot, link, popup } of tilesByUrl.values()) {
+      for (const { service, dot, link, popup } of tiles) {
         const result = resultsByTarget.get(service.url);
         if (!result) {
           dot.className = "dot dot--warn";
@@ -136,7 +136,7 @@ window.DASH.registerWidget("status", {
     } catch {
       if (state.aborter !== aborter || aborter.signal.aborted) return;
 
-      for (const { service, dot, link, popup } of tilesByUrl.values()) {
+      for (const { service, dot, link, popup } of tiles) {
         dot.className = "dot dot--warn";
         const tip = "gateway unreachable";
         dot.dataset.tip = tip;

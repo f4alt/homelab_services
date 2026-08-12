@@ -71,7 +71,9 @@ Current reusable JavaScript primitives include:
 Current reusable CSS covers widget and tile surfaces, tiled/full-width/scrolling
 lists, headers, split panels, metric rows, state and severity colors, clickable
 surfaces, menus, inputs, popups, toggles, status dots, progress bars, icons, and
-the standard `label`, `label-info`, and `value-large` typography.
+the standard `label`, `label-info`, and `value-large` typography. Tiled lists
+fit their children by default; add `list-tiled--fill` only when the widget's
+tiles should claim the available horizontal and vertical space.
 
 ## Frontend Contract
 

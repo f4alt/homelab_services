@@ -27,7 +27,13 @@ const TIME_SINCE_STYLES = `
     }
 
     .time-since-name {
+      display: block;
       width: 100%;
+    }
+
+    .time-since-name-region {
+      max-width: 100%;
+      min-width: 0;
     }
 
     .time-since-age-token--normal {
@@ -44,12 +50,12 @@ const TIME_SINCE_STYLES = `
     }
 
     .time-since-tooltip {
-      --popup-transform: translateY(-50%);
+      --popup-transform: none;
 
-      left: var(--space-xs);
-      right: var(--space-xs);
+      left: 0;
+      right: 0;
       text-align: left;
-      top: 50%;
+      top: 0;
       white-space: normal;
     }
 
@@ -99,15 +105,18 @@ function renderMenu(state) {
 }
 
 function createTileView(state, item) {
-  const tile = createTile("popup-on-hover time-since-tile");
+  const tile = createTile("time-since-tile");
+  const nameRegion = createElement("div", "popup-on-hover time-since-name-region");
   const name = createElement("span", "label truncate time-since-name", item.name);
   const resetButton = document.createElement("button");
   resetButton.type = "button";
   const popup = createElement("div", "popup label-info time-since-tooltip");
   popup.setAttribute("role", "tooltip");
+  nameRegion.setAttribute("tabindex", "0");
 
-  tile.append(resetButton, name, popup);
-  const tileView = { tile, name, popup, resetButton, item };
+  nameRegion.append(name, popup);
+  tile.append(resetButton, nameRegion);
+  const tileView = { tile, name, nameRegion, popup, resetButton, item };
   resetButton.addEventListener("click", () => completeNow(state, tileView.item));
   updateTileView(state, tileView, item);
   return tileView;
@@ -127,6 +136,10 @@ function updateTileView(state, tileView, item) {
   tileView.item = item;
   tileView.name.textContent = item.name;
   tileView.popup.textContent = presentation.tooltip;
+  tileView.nameRegion.setAttribute(
+    "aria-label",
+    `${item.name}. ${presentation.tooltip}`
+  );
   tileView.resetButton.className = [
     "clickable",
     "clickable--compact",

@@ -66,7 +66,6 @@ window.DASH_CONFIG = {
       width: 1,
       refreshMs: 30000,
       props: {
-        tileMinWidth: 220,
         services: []
       }
     },

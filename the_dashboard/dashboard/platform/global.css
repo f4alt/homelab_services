@@ -126,27 +126,40 @@ html,body {
 /***** consistent widget styling framework
  *
  */
-/* tiled lists - children wrap and claim the available surface */
+/* tiled lists wrap around their contents unless a widget opts into filling */
 .list-tiled {
-  --tile-min: 16rem;
   --tile-gap: var(--gap);
 
-  align-content: stretch;
-  align-items: stretch;
+  align-content: flex-start;
+  align-items: flex-start;
   display: flex;
-  flex: 1 1 auto;
   flex-wrap: wrap;
   gap: var(--tile-gap);
 }
 
 .list-tiled > * {
-  flex: 1 1 var(--tile-min);
-  min-width: min(100%, var(--tile-min));
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-width: min(100%, var(--tile-min, 0px));
+}
+
+.list-tiled--fill {
+  --tile-fill-min: 16rem;
+
+  align-content: stretch;
+  align-items: stretch;
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.list-tiled--fill > * {
+  flex-basis: var(--tile-min, var(--tile-fill-min));
+  flex-grow: 1;
 }
 
 .list-tiled--preferred-columns > * {
   flex-basis: max(
-    var(--tile-min),
+    var(--tile-min, 0px),
     calc(
       (100% - (var(--tile-column-gaps) * var(--tile-gap))) /
         var(--tile-columns)

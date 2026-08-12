@@ -146,7 +146,7 @@ test("time-since uses the shared empty state for an empty collection", async () 
   );
 });
 
-test("time-since day buttons reset from above the task name and expose a shared popup", async () => {
+test("time-since popup is anchored to and triggered only by the task name", async () => {
   const approachingTimestamp = new Date(Date.now() - (8 * DAY_MS)).toISOString();
   const items = [
     {
@@ -175,6 +175,7 @@ test("time-since day buttons reset from above the task name and expose a shared 
 
       const knownTile = state.grid.children[0];
       const knownButton = findByClass(knownTile, "time-since-reset-button");
+      const knownNameRegion = findByClass(knownTile, "time-since-name-region");
       const knownName = findByClass(knownTile, "time-since-name");
       const popup = findByClass(knownTile, "time-since-tooltip");
       const unknownButton = findByClass(
@@ -183,7 +184,12 @@ test("time-since day buttons reset from above the task name and expose a shared 
       );
 
       assert.equal(knownTile.children[0], knownButton);
-      assert.equal(knownTile.children[1], knownName);
+      assert.equal(knownTile.classList.contains("popup-on-hover"), false);
+      assert.notEqual(knownNameRegion, null);
+      assert.equal(knownTile.children[1], knownNameRegion);
+      assert.equal(knownNameRegion.classList.contains("popup-on-hover"), true);
+      assert.equal(knownName.parentElement, knownNameRegion);
+      assert.equal(popup.parentElement, knownNameRegion);
       assert.equal(knownButton.tagName, "button");
       assert.equal(knownButton.textContent, "8");
       assert.equal(knownButton.classList.contains("clickable"), true);

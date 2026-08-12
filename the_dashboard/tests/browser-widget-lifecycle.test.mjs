@@ -116,6 +116,7 @@ test("responsive grids accept only camelCase layout props", async () => {
     "--tile-min": "180px"
   });
   assert.equal(configuredGrid.classList.contains("list-tiled--preferred-columns"), true);
+  assert.equal(configuredGrid.classList.contains("list-tiled--fill"), false);
   assert.deepEqual(Object.fromEntries(legacyProperties), {});
 });
 
@@ -169,7 +170,7 @@ test("Text renders configured text without registering network updates", async (
   });
 });
 
-test("Clocks use the shared large-value typography for time", async () => {
+test("Clocks use shared typography and opt into filling their widget", async () => {
   let registration;
   const head = new FakeElement("head");
   await withPatchedGlobals({
@@ -193,6 +194,7 @@ test("Clocks use the shared large-value typography for time", async () => {
     });
 
     assert.equal(registration.type, "clocks");
+    assert.equal(root.children[0].classList.contains("list-tiled--fill"), true);
     assert.match(state.cards[0].timeElement.className, /(^|\s)value-large(\s|$)/);
   });
 });

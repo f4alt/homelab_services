@@ -77,15 +77,6 @@ const CALENDAR_STYLES = `
       padding: 0;
     }
 
-    .calendar-day:hover {
-      background: rgba(var(--ok-rgb), .08);
-    }
-
-    .calendar-day:focus-visible {
-      outline: 2px solid var(--ok);
-      outline-offset: 1px;
-    }
-
     .calendar-day--spillover {
       color: var(--muted);
       opacity: .62;
