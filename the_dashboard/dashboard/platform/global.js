@@ -1,4 +1,13 @@
 const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
+const POPUP_ANCHOR_PREFIX = "--dashboard-popup-anchor";
+const POPUP_ANCHOR_SUPPORT_QUERIES = Object.freeze([
+  `anchor-name: ${POPUP_ANCHOR_PREFIX}`,
+  `position-anchor: ${POPUP_ANCHOR_PREFIX}`,
+  "top: anchor(top)",
+  "left: anchor(50%)",
+  "width: anchor-size(width)"
+]);
+let nextPopupAnchorIndex = 0;
 
 export function apiBase() {
   return (window.DASH_CONFIG?.apiBase ?? "").replace(/\/+$/, "");
@@ -118,6 +127,62 @@ export function createTile(className = "") {
   return createElement("div", `ui-tile ${className}`.trim());
 }
 
+function prepareFloatingPopup(trigger, popup) {
+  if (
+    typeof CSS === "undefined" ||
+    typeof CSS.supports !== "function" ||
+    !POPUP_ANCHOR_SUPPORT_QUERIES.every((query) => CSS.supports(query)) ||
+    typeof popup.showPopover !== "function" ||
+    typeof popup.hidePopover !== "function"
+  ) {
+    return false;
+  }
+
+  nextPopupAnchorIndex += 1;
+  const anchorName = `${POPUP_ANCHOR_PREFIX}-${nextPopupAnchorIndex}`;
+
+  trigger.style.setProperty("anchor-name", anchorName);
+  popup.style.setProperty("position-anchor", anchorName);
+  popup.setAttribute("popover", "manual");
+  popup.classList.add("popup--floating");
+  return true;
+}
+
+export function bindHoverPopup(trigger, popup) {
+  if (!prepareFloatingPopup(trigger, popup)) return false;
+
+  let focused = false;
+  let hovered = false;
+  let open = false;
+
+  function syncVisibility() {
+    const shouldOpen = focused || hovered;
+    if (shouldOpen === open) return;
+
+    if (shouldOpen) popup.showPopover();
+    else popup.hidePopover();
+    open = shouldOpen;
+  }
+
+  trigger.addEventListener("mouseenter", () => {
+    hovered = true;
+    syncVisibility();
+  });
+  trigger.addEventListener("mouseleave", () => {
+    hovered = false;
+    syncVisibility();
+  });
+  trigger.addEventListener("focusin", () => {
+    focused = true;
+    syncVisibility();
+  });
+  trigger.addEventListener("focusout", () => {
+    focused = false;
+    syncVisibility();
+  });
+  return true;
+}
+
 export function createDismissibleMenu({
   trigger,
   menu,
@@ -125,6 +190,7 @@ export function createDismissibleMenu({
   onOpenChange = () => {}
 }) {
   let open = false;
+  const floating = prepareFloatingPopup(trigger, menu);
 
   function onDocumentClick(event) {
     if (!containsTarget(event.target)) close();
@@ -142,12 +208,15 @@ export function createDismissibleMenu({
 
     open = next;
     trigger.setAttribute("aria-expanded", String(open));
-    menu.classList.toggle("popup-menu-open", open);
 
     if (open) {
+      menu.classList.add("popup-menu-open");
+      if (floating) menu.showPopover();
       document.addEventListener("click", onDocumentClick);
       document.addEventListener("keydown", onDocumentKeydown);
     } else {
+      if (floating) menu.hidePopover();
+      menu.classList.remove("popup-menu-open");
       document.removeEventListener("click", onDocumentClick);
       document.removeEventListener("keydown", onDocumentKeydown);
     }

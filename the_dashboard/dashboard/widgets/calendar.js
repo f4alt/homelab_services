@@ -1,4 +1,5 @@
 import {
+  bindHoverPopup,
   createElement,
   createTile,
   createWidgetMessage,
@@ -138,8 +139,14 @@ const CALENDAR_STYLES = `
     }
 
     .calendar-countdown .popup {
-      bottom: calc(var(--progress-height) + var(--space-sm));
       --popup-transform: translateX(-50%);
+      bottom: calc(var(--progress-height) + var(--space-sm));
+    }
+
+    .calendar-countdown .popup.popup--floating {
+      --popup-transform: translate(-50%, -100%);
+      bottom: auto;
+      top: calc(anchor(bottom) - var(--progress-height) - var(--space-sm));
     }
 
     .calendar-countdown--today .popup {
@@ -234,6 +241,9 @@ function createCountdownBar(label, targetDate = null) {
     chip.style.left = `${countdown.chipPercent}%`;
     chip.appendChild(createElement("div", "label", countdown.chipText));
     bottom.appendChild(chip);
+    if (bindHoverPopup(bar, chip)) {
+      chip.style.left = `anchor(${countdown.chipPercent}%)`;
+    }
     futureFill.style.width = `${countdown.futurePercent}%`;
     overdueFill.style.width = `${countdown.overduePercent}%`;
     bar.classList.toggle("calendar-countdown--today", countdown.mode === "today");

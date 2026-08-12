@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createDismissibleMenu } from "../dashboard/platform/global.js";
+import {
+  bindHoverPopup,
+  createDismissibleMenu
+} from "../dashboard/platform/global.js";
 import {
   FakeDocument,
   FakeElement,
@@ -9,13 +12,46 @@ import {
 } from "./helpers/fake-dom.mjs";
 import { withPatchedGlobals } from "./helpers/test-utils.mjs";
 
+test("hover popups keep their in-flow fallback without CSS anchor support", async () => {
+  const trigger = new FakeElement("div", { supportsPopover: true });
+  const popup = new FakeElement("div", { supportsPopover: true });
+
+  await withPatchedGlobals({ CSS: { supports: () => false } }, async () => {
+    bindHoverPopup(trigger, popup);
+
+    trigger.fire("mouseenter");
+    assert.equal(popup.classList.contains("popup--floating"), false);
+    assert.equal(popup.getAttribute("popover"), null);
+    assert.equal(popup.showPopoverCalls, 0);
+  });
+});
+
+test("hover popups require every anchor feature used by shared styles", async () => {
+  const trigger = new FakeElement("div", { supportsPopover: true });
+  const popup = new FakeElement("div", { supportsPopover: true });
+
+  await withPatchedGlobals({
+    CSS: {
+      supports: (query) => query !== "width: anchor-size(width)"
+    }
+  }, async () => {
+    bindHoverPopup(trigger, popup);
+
+    assert.equal(popup.classList.contains("popup--floating"), false);
+    assert.equal(popup.getAttribute("popover"), null);
+  });
+});
+
 test("dismissible menu toggles ARIA state and keeps listeners only while open", async () => {
   const fakeDocument = new FakeDocument();
-  const trigger = new FakeElement();
-  const menu = new FakeElement();
+  const trigger = new FakeElement("button", { supportsPopover: true });
+  const menu = new FakeElement("div", { supportsPopover: true });
   const changes = [];
 
-  await withPatchedGlobals({ document: fakeDocument }, async () => {
+  await withPatchedGlobals({
+    CSS: { supports: () => true },
+    document: fakeDocument
+  }, async () => {
     const controller = createDismissibleMenu({
       trigger,
       menu,
@@ -24,6 +60,8 @@ test("dismissible menu toggles ARIA state and keeps listeners only while open", 
 
     assert.equal(controller.isOpen(), false);
     assert.equal(trigger.getAttribute("aria-expanded"), "false");
+    assert.equal(menu.classList.contains("popup--floating"), true);
+    assert.equal(menu.getAttribute("popover"), "manual");
     assert.equal(fakeDocument.listenerCount("click"), 0);
     assert.equal(fakeDocument.listenerCount("keydown"), 0);
 
@@ -31,6 +69,7 @@ test("dismissible menu toggles ARIA state and keeps listeners only while open", 
     assert.equal(controller.isOpen(), true);
     assert.equal(trigger.getAttribute("aria-expanded"), "true");
     assert.equal(menu.classList.contains("popup-menu-open"), true);
+    assert.equal(menu.showPopoverCalls, 1);
     assert.equal(fakeDocument.listenerCount("click"), 1);
     assert.equal(fakeDocument.listenerCount("keydown"), 1);
 
@@ -38,6 +77,7 @@ test("dismissible menu toggles ARIA state and keeps listeners only while open", 
     assert.equal(controller.isOpen(), false);
     assert.equal(trigger.getAttribute("aria-expanded"), "false");
     assert.equal(menu.classList.contains("popup-menu-open"), false);
+    assert.equal(menu.hidePopoverCalls, 1);
     assert.equal(fakeDocument.listenerCount("click"), 0);
     assert.equal(fakeDocument.listenerCount("keydown"), 0);
     assert.deepEqual(changes, [true, false]);

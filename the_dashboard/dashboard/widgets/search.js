@@ -43,6 +43,12 @@ const SEARCH_STYLES = `
       right: 0;
       top: calc(100% + var(--space-compact));
     }
+
+    .search-engine-menu.popup--floating {
+      left: anchor(right);
+      right: auto;
+      transform: translateX(-100%);
+    }
   `;
 
 function getEnginesFromProps(props) {

@@ -74,7 +74,7 @@ test("system-health renders one compact neutral strip of host readings", async (
     assert.equal(findByClass(root, "dot"), null);
     assert.equal(findByClass(root, "system-health-state"), null);
     assert.equal(findByClass(root, "ui-tile--compact") !== null, true);
-    assert.equal(state.grid.classList.contains("list-tiled--fill"), true);
+    assert.equal(state.grid.classList.contains("list-fullWidth"), true);
     assert.equal(findByClass(root, "severity-ok"), null);
     assert.equal(findByClass(root, "severity-warn"), null);
     assert.equal(findByClass(root, "severity-error"), null);

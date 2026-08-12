@@ -24,17 +24,28 @@ export class FakeClassList {
 }
 
 export class FakeElement {
-  constructor(tagName = "div") {
+  constructor(tagName = "div", { supportsPopover = false } = {}) {
     this.attributes = new Map();
     this.children = [];
     this.classList = new FakeClassList();
     this.dataset = {};
     this.events = new Map();
     this.focusCalls = 0;
+    this.hidePopoverCalls = 0;
+    this.showPopoverCalls = 0;
     this.style = { setProperty() {} };
     this.tagName = tagName;
     this.textContent = "";
     this.value = "";
+
+    if (supportsPopover) {
+      this.hidePopover = () => {
+        this.hidePopoverCalls += 1;
+      };
+      this.showPopover = () => {
+        this.showPopoverCalls += 1;
+      };
+    }
   }
 
   set className(value) {
@@ -130,9 +141,10 @@ export class FakeElement {
 }
 
 export class FakeDocument {
-  constructor() {
+  constructor({ supportsPopover = false } = {}) {
     this.head = new FakeElement("head");
     this.listeners = new Map();
+    this.supportsPopover = supportsPopover;
   }
 
   addEventListener(type, listener) {
@@ -146,7 +158,7 @@ export class FakeDocument {
   }
 
   createElement(tagName) {
-    return new FakeElement(tagName);
+    return new FakeElement(tagName, { supportsPopover: this.supportsPopover });
   }
 
   getElementById(id) {

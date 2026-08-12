@@ -1,5 +1,5 @@
 import {
-  createResponsiveGrid,
+  createStack,
   createTile,
   installWidgetStyles,
   setStateMessage
@@ -11,6 +11,7 @@ const CLOCK_STYLES = `
     .clock-tile {
       align-content: center;
       display: grid;
+      flex: 1 1 0;
       grid-template-columns: 1fr auto;
     }
   `;
@@ -68,7 +69,7 @@ window.DASH.registerWidget("clocks", {
   mount(root, { props = {} }) {
     installWidgetStyles(CLOCK_STYLE_ID, CLOCK_STYLES);
 
-    const grid = createResponsiveGrid(props, "list-tiled list-tiled--fill");
+    const grid = createStack();
     root.replaceChildren(grid);
 
     const zones = Array.isArray(props?.zones) ? props.zones : [];

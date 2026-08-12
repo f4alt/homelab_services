@@ -1,6 +1,6 @@
 import {
   createElement,
-  createResponsiveGrid,
+  createStack,
   createTile,
   fetchJson,
   installWidgetStyles,
@@ -34,6 +34,7 @@ const SYSTEM_HEALTH_STYLES = `
 
       align-content: center;
       display: flex;
+      flex: 1 1 auto;
       flex-wrap: wrap;
       gap: var(--space-sm) var(--gap);
     }
@@ -194,7 +195,7 @@ window.DASH.registerWidget("system-health", {
     installWidgetStyles(SYSTEM_HEALTH_STYLE_ID, SYSTEM_HEALTH_STYLES);
 
     const normalizedProps = normalizeProps(props);
-    const grid = createResponsiveGrid(props, "list-tiled list-tiled--fill");
+    const grid = createStack();
     const tile = createTile("ui-tile--compact system-health-tile");
     const metrics = createElement("dl", "system-health-metrics");
     const values = {};

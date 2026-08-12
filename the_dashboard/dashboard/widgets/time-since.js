@@ -1,4 +1,5 @@
 import {
+  bindHoverPopup,
   createDismissibleMenu,
   createElement,
   createResponsiveGrid,
@@ -59,6 +60,10 @@ const TIME_SINCE_STYLES = `
       white-space: normal;
     }
 
+    .time-since-tooltip.popup--floating {
+      width: anchor-size(width);
+    }
+
     .time-since-reset-button:disabled {
       color: var(--muted);
       cursor: wait;
@@ -116,6 +121,7 @@ function createTileView(state, item) {
 
   nameRegion.append(name, popup);
   tile.append(resetButton, nameRegion);
+  bindHoverPopup(nameRegion, popup);
   const tileView = { tile, name, nameRegion, popup, resetButton, item };
   resetButton.addEventListener("click", () => completeNow(state, tileView.item));
   updateTileView(state, tileView, item);

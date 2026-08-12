@@ -21,6 +21,10 @@ docker compose up --build -d
 The dashboard is served by Nginx at `http://localhost:8080` by default. Gateway
 is the single internal backend service on the Compose network.
 
+The frontend targets browsers with the HTML Popover API and CSS Anchor
+Positioning. Older browsers retain usable in-flow popups, but the supported
+baseline is required for popups to escape scrolling widget containers.
+
 ## Project Shape
 
 | Path | Purpose |

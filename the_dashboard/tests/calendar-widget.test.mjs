@@ -63,8 +63,9 @@ async function withCalendarWidget(fetchImplementation, run) {
   };
 
   await withPatchedGlobals({
+    CSS: { supports: () => true },
     Date: FixedDate,
-    document: new FakeDocument(),
+    document: new FakeDocument({ supportsPopover: true }),
     fetch: fetchImplementation,
     window
   }, async () => {
@@ -105,6 +106,15 @@ test("calendar renders a semantic fixed grid, boolean dots, and the two default 
     assert.equal(findAll(root, (element) => (
       element.classList.contains("calendar-day-dot") && element.hidden === false
     )).length, 1);
+    const countdownPopups = findAll(
+      root,
+      (element) => element.classList.contains("popup")
+    );
+    assert.equal(countdownPopups.length, 2);
+    assert.equal(countdownPopups.every((popup) => (
+      popup.classList.contains("popup--floating") &&
+      popup.getAttribute("popover") === "manual"
+    )), true);
     assert.match(requests[0], /^\/api\/calendar\/events\?/);
     assert.match(requests[0], /feedUrl=webcal%3A%2F%2Fcalendar\.example\.test/);
   });

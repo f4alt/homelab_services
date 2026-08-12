@@ -23,7 +23,8 @@ async function withStatusWidget(fetchImplementation, run) {
   };
 
   await withPatchedGlobals({
-    document: new FakeDocument(),
+    CSS: { supports: () => true },
+    document: new FakeDocument({ supportsPopover: true }),
     fetch: fetchImplementation,
     window
   }, async () => {
@@ -62,6 +63,9 @@ test("status lets only the newest request mutate a tile or clear its aborter", a
         }
       });
       const [tile] = state.tiles;
+
+      assert.equal(tile.popup.classList.contains("popup--floating"), true);
+      assert.equal(tile.popup.getAttribute("popover"), "manual");
 
       const staleUpdate = registration.implementation.update(state);
       const secondUpdate = registration.implementation.update(state);

@@ -1,4 +1,5 @@
 import {
+  bindHoverPopup,
   createResponsiveGrid,
   createStyledIcon,
   fetchJson,
@@ -80,6 +81,7 @@ window.DASH.registerWidget("status", {
       name.textContent = service.name || service.url;
 
       dotWrap.append(dot, popup);
+      bindHoverPopup(dotWrap, popup);
       tile.append(dotWrap, iconBox, name);
       link.appendChild(tile);
       grid.appendChild(link);

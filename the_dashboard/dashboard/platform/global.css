@@ -126,7 +126,7 @@ html,body {
 /***** consistent widget styling framework
  *
  */
-/* tiled lists wrap around their contents unless a widget opts into filling */
+/* tiled lists wrap around their contents */
 .list-tiled {
   --tile-gap: var(--gap);
 
@@ -143,20 +143,6 @@ html,body {
   min-width: min(100%, var(--tile-min, 0px));
 }
 
-.list-tiled--fill {
-  --tile-fill-min: 16rem;
-
-  align-content: stretch;
-  align-items: stretch;
-  flex: 1 1 auto;
-  width: 100%;
-}
-
-.list-tiled--fill > * {
-  flex-basis: var(--tile-min, var(--tile-fill-min));
-  flex-grow: 1;
-}
-
 .list-tiled--preferred-columns > * {
   flex-basis: max(
     var(--tile-min, 0px),
@@ -170,6 +156,7 @@ html,body {
 /* children take full width of parent and stack vertically */
 .list-fullWidth {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--grid-gap);
 }
@@ -588,4 +575,17 @@ button.clickable {
   box-shadow: 0 10px 30px rgba(var(--card-shadow), .85);
   display: none;
   flex-direction: column;
+}
+
+.popup.popup--floating {
+  inset: auto;
+  left: anchor(left);
+  margin: 0;
+  position: fixed;
+  top: anchor(top);
+  width: max-content;
+}
+
+.popup.popup-menu.popup--floating {
+  top: calc(anchor(bottom) + var(--space-compact));
 }

@@ -66,14 +66,16 @@ Current reusable JavaScript primitives include:
   `--tile-padding`, `--tile-radius`, and `--tile-box-shadow` overrides
 - `createDismissibleMenu()` for per-instance popup state, ARIA expansion,
   temporary outside-click/Escape listeners, and focus return
+- `bindHoverPopup()` for hover/focus tooltip state and top-layer positioning
 - `createStyledIcon()` for text, emoji, or image icons
 
 Current reusable CSS covers widget and tile surfaces, tiled/full-width/scrolling
 lists, headers, split panels, metric rows, state and severity colors, clickable
 surfaces, menus, inputs, popups, toggles, status dots, progress bars, icons, and
 the standard `label`, `label-info`, and `value-large` typography. Tiled lists
-fit their children by default; add `list-tiled--fill` only when the widget's
-tiles should claim the available horizontal and vertical space.
+fit their children by default; use `list-fullWidth` when each child should fill
+the available width and the vertical stack should claim the remaining widget
+space.
 
 ## Frontend Contract
 
@@ -156,6 +158,9 @@ Follow these lifecycle rules:
   listeners and background timers when the shell lifecycle can do the work.
 - Use `createDismissibleMenu()` for listboxes and popup menus that need outside
   dismissal. Its document listeners exist only while that instance is open.
+- Use `bindHoverPopup()` for hover/focus tooltips inside scrolling or capped
+  content. It promotes supported popups to the browser top layer so ancestor
+  overflow cannot clip them.
 - Let unexpected mount/update failures reach the shell so it can isolate the
   failed tile. Render expected loading, empty, offline, and validation states
   inside the widget with `setStateMessage()`.

@@ -19,7 +19,7 @@ const DAY_MS = 86_400_000;
 let widgetImportNumber = 0;
 
 async function withTimeSinceWidget(fetchImplementation, run) {
-  const fakeDocument = new FakeDocument();
+  const fakeDocument = new FakeDocument({ supportsPopover: true });
   let intervalCallCount = 0;
   let registration;
   const setInterval = () => {
@@ -36,6 +36,7 @@ async function withTimeSinceWidget(fetchImplementation, run) {
   };
 
   await withPatchedGlobals({
+    CSS: { supports: () => true },
     document: fakeDocument,
     fetch: fetchImplementation,
     setInterval,
@@ -200,8 +201,24 @@ test("time-since popup is anchored to and triggered only by the task name", asyn
       );
       assert.match(knownButton.getAttribute("aria-label"), /^Reset days for Known activity\./);
       assert.equal(popup.classList.contains("popup"), true);
+      assert.equal(popup.classList.contains("popup--floating"), true);
+      assert.equal(popup.getAttribute("popover"), "manual");
       assert.equal(popup.getAttribute("role"), "tooltip");
       assert.match(popup.textContent, /Last done: .* · Target: 10 days · Approaching/);
+      knownNameRegion.fire("mouseenter");
+      assert.equal(popup.showPopoverCalls, 1);
+      knownNameRegion.fire("focusin");
+      assert.equal(popup.showPopoverCalls, 1);
+      knownNameRegion.fire("mouseleave");
+      assert.equal(popup.hidePopoverCalls, 0);
+      knownNameRegion.fire("focusout");
+      assert.equal(popup.hidePopoverCalls, 1);
+      knownNameRegion.fire("focusin");
+      assert.equal(popup.showPopoverCalls, 2);
+      knownNameRegion.fire("focusout");
+      assert.equal(popup.hidePopoverCalls, 2);
+      knownButton.fire("mouseenter");
+      assert.equal(popup.showPopoverCalls, 2);
       assert.equal(unknownButton.textContent, "?");
       assert.equal(unknownButton.classList.contains("time-since-age-token--unknown"), true);
       assert.equal(treeText(state.grid).includes("Done now"), false);
