@@ -126,15 +126,17 @@ html,body {
 /***** consistent widget styling framework
  *
  */
-/* tiled lists wrap around their contents */
+/* Preserve configured vertical rhythm while equalizing every horizontal space. */
 .list-tiled {
   --tile-gap: var(--gap);
 
   align-content: flex-start;
   align-items: flex-start;
+  column-gap: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--tile-gap);
+  justify-content: space-evenly;
+  row-gap: var(--tile-gap);
 }
 
 .list-tiled > * {

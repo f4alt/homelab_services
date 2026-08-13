@@ -1,5 +1,5 @@
 import {
-  bindHoverPopup,
+  createDismissalController,
   createDismissibleMenu,
   createElement,
   createResponsiveGrid,
@@ -20,21 +20,88 @@ const TIME_SINCE_STYLE_ID = "time-since-widget-styles";
 
 const TIME_SINCE_STYLES = `
     .time-since-tile {
+      --time-since-flip-duration: 300ms;
+      --time-since-flip-perspective: 48rem;
+
+      perspective: var(--time-since-flip-perspective);
+      text-align: center;
+    }
+
+    .time-since-flipper {
+      display: grid;
+      transform-style: preserve-3d;
+      transition: transform var(--time-since-flip-duration) ease;
+      width: 100%;
+    }
+
+    .time-since-tile--flipped .time-since-flipper {
+      transform: rotateY(180deg);
+    }
+
+    .time-since-face {
+      backface-visibility: hidden;
+      grid-area: 1 / 1;
+      min-width: 0;
+    }
+
+    .time-since-face--front {
       align-items: center;
       display: grid;
       gap: var(--space-sm);
       justify-items: center;
-      text-align: center;
+      transform: rotateY(0deg);
+    }
+
+    .time-since-face--back {
+      align-content: center;
+      appearance: none;
+      background: transparent;
+      border: 0;
+      color: inherit;
+      cursor: pointer;
+      display: grid;
+      padding: 0;
+      text-align: left;
+      transform: rotateY(180deg);
+      width: 100%;
     }
 
     .time-since-name {
       display: block;
+      max-width: 100%;
       width: 100%;
     }
 
-    .time-since-name-region {
+    .time-since-name-button {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      cursor: pointer;
       max-width: 100%;
       min-width: 0;
+      padding: 0;
+      text-align: center;
+    }
+
+    .time-since-name-button:is(:hover, :focus-visible) {
+      text-decoration: underline;
+      text-underline-offset: var(--space-xs);
+    }
+
+    .time-since-details {
+      display: grid;
+      gap: var(--space-xs);
+    }
+
+    .time-since-detail-row {
+      display: grid;
+      gap: var(--space-sm);
+      grid-template-columns: max-content minmax(0, 1fr);
+    }
+
+    .time-since-detail-value {
+      color: var(--fg);
+      overflow-wrap: anywhere;
     }
 
     .time-since-age-token--normal {
@@ -50,23 +117,15 @@ const TIME_SINCE_STYLES = `
       color: var(--err);
     }
 
-    .time-since-tooltip {
-      --popup-transform: none;
-
-      left: 0;
-      right: 0;
-      text-align: left;
-      top: 0;
-      white-space: normal;
-    }
-
-    .time-since-tooltip.popup--floating {
-      width: anchor-size(width);
-    }
-
     .time-since-reset-button:disabled {
       color: var(--muted);
       cursor: wait;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .time-since-flipper {
+        transition: none;
+      }
     }
   `;
 
@@ -109,20 +168,89 @@ function renderMenu(state) {
   }
 }
 
+function syncTileFlipState(tileView, flipped) {
+  tileView.tile.classList.toggle("time-since-tile--flipped", flipped);
+  tileView.front.setAttribute("aria-hidden", String(flipped));
+  tileView.backButton.setAttribute("aria-hidden", String(!flipped));
+  tileView.nameButton.setAttribute("aria-expanded", String(flipped));
+  tileView.nameButton.setAttribute("tabindex", flipped ? "-1" : "0");
+  tileView.resetButton.setAttribute("tabindex", flipped ? "-1" : "0");
+  tileView.backButton.setAttribute("tabindex", flipped ? "0" : "-1");
+}
+
+function setOpenTileView(state, nextTileView) {
+  const previousTileView = state.openTileView;
+  if (previousTileView === nextTileView) return;
+
+  if (previousTileView) syncTileFlipState(previousTileView, false);
+  state.openTileView = nextTileView;
+  if (nextTileView) {
+    syncTileFlipState(nextTileView, true);
+    nextTileView.backButton.focus();
+  }
+
+  if (!previousTileView && nextTileView) {
+    state.detailsDismissal.activate();
+  } else if (previousTileView && !nextTileView) {
+    state.detailsDismissal.deactivate();
+  }
+}
+
+function closeTileDetails(state, restoreFocus = false) {
+  const openTileView = state.openTileView;
+  if (!openTileView) return;
+
+  setOpenTileView(state, null);
+  if (restoreFocus) openTileView.nameButton.focus();
+}
+
+function renderDetails(container, details) {
+  const rows = details.map(({ label, value }) => {
+    const row = createElement("span", "time-since-detail-row");
+    const term = createElement("span", "label-info", label);
+    const description = createElement(
+      "span",
+      "label-info time-since-detail-value",
+      value
+    );
+    row.append(term, description);
+    return row;
+  });
+  container.replaceChildren(...rows);
+}
+
 function createTileView(state, item) {
   const tile = createTile("time-since-tile");
-  const nameRegion = createElement("div", "popup-on-hover time-since-name-region");
-  const name = createElement("span", "label truncate time-since-name", item.name);
+  const flipper = createElement("div", "time-since-flipper");
+  const front = createElement("div", "time-since-face time-since-face--front");
+  const nameButton = document.createElement("button");
+  nameButton.type = "button";
+  nameButton.className = "label truncate time-since-name time-since-name-button";
   const resetButton = document.createElement("button");
   resetButton.type = "button";
-  const popup = createElement("div", "popup label-info time-since-tooltip");
-  popup.setAttribute("role", "tooltip");
-  nameRegion.setAttribute("tabindex", "0");
+  const backButton = document.createElement("button");
+  backButton.type = "button";
+  backButton.className = "time-since-face time-since-face--back";
+  const details = createElement("span", "time-since-details");
 
-  nameRegion.append(name, popup);
-  tile.append(resetButton, nameRegion);
-  bindHoverPopup(nameRegion, popup);
-  const tileView = { tile, name, nameRegion, popup, resetButton, item };
+  front.append(resetButton, nameButton);
+  backButton.appendChild(details);
+  flipper.append(front, backButton);
+  tile.appendChild(flipper);
+
+  const tileView = {
+    tile,
+    front,
+    backButton,
+    details,
+    nameButton,
+    resetButton,
+    item
+  };
+  nameButton.addEventListener("click", () => {
+    setOpenTileView(state, state.openTileView === tileView ? null : tileView);
+  });
+  backButton.addEventListener("click", () => closeTileDetails(state, true));
   resetButton.addEventListener("click", () => completeNow(state, tileView.item));
   updateTileView(state, tileView, item);
   return tileView;
@@ -140,12 +268,19 @@ function updateTileView(state, tileView, item) {
   );
 
   tileView.item = item;
-  tileView.name.textContent = item.name;
-  tileView.popup.textContent = presentation.tooltip;
-  tileView.nameRegion.setAttribute(
+  tileView.nameButton.textContent = item.name;
+  tileView.nameButton.setAttribute(
     "aria-label",
-    `${item.name}. ${presentation.tooltip}`
+    `Show details for ${item.name}`
   );
+  const accessibleDetails = presentation.details
+    .map(({ label, value }) => `${label}: ${value}`)
+    .join(". ");
+  tileView.backButton.setAttribute(
+    "aria-label",
+    `Hide details for ${item.name}. ${accessibleDetails}`
+  );
+  renderDetails(tileView.details, presentation.details);
   tileView.resetButton.className = [
     "clickable",
     "clickable--compact",
@@ -158,8 +293,9 @@ function updateTileView(state, tileView, item) {
   tileView.resetButton.disabled = Boolean(pendingCompletion);
   tileView.resetButton.setAttribute(
     "aria-label",
-    `Reset days for ${item.name}. ${presentation.tooltip}`
+    `Reset days for ${item.name}`
   );
+  syncTileFlipState(tileView, state.openTileView === tileView);
 }
 
 function replaceChildrenWhenChanged(container, children) {
@@ -182,6 +318,11 @@ function render(state) {
   const visibleItems = state.selectedSource
     ? state.items.filter((item) => item.source_file === state.selectedSource)
     : state.items;
+  const visibleUids = new Set(visibleItems.map((item) => item.uid));
+
+  if (state.openTileView && !visibleUids.has(state.openTileView.item.uid)) {
+    closeTileDetails(state);
+  }
 
   const currentUids = new Set(state.items.map((item) => item.uid));
   for (const uid of state.tileViews.keys()) {
@@ -243,6 +384,7 @@ function replaceOrInsertItem(state, uid, replacement, preferredIndex) {
 }
 
 function showCompletionError(state, error, fallbackMessage) {
+  closeTileDetails(state);
   setStateMessage(
     state.grid,
     String(error?.message || fallbackMessage),
@@ -345,8 +487,15 @@ window.DASH.registerWidget("time-since", {
       menuSources: [],
       menuItems: new Map(),
       tileViews: new Map(),
-      pendingCompletions: new Map()
+      pendingCompletions: new Map(),
+      openTileView: null,
+      detailsDismissal: null
     };
+
+    state.detailsDismissal = createDismissalController({
+      containsTarget: (target) => Boolean(state.openTileView?.tile.contains(target)),
+      onDismiss: ({ restoreFocus }) => closeTileDetails(state, restoreFocus)
+    });
 
     state.menuController = createDismissibleMenu({
       trigger: sourceButton,
@@ -362,6 +511,7 @@ window.DASH.registerWidget("time-since", {
     try {
       await loadItems(state);
     } catch (error) {
+      closeTileDetails(state);
       setStateMessage(
         state.grid,
         String(error?.message || "Unable to load tracked activities."),

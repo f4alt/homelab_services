@@ -50,15 +50,23 @@ function classifyAge(elapsedMs, targetDays, approachingRatio) {
   return CLASSIFICATION.NORMAL;
 }
 
-function buildTooltip(lastDone, targetDays, classification) {
-  const target = targetDays === null
-    ? "No target"
-    : `Target: ${targetDays} ${targetDays === 1 ? "day" : "days"}`;
-  return [
-    `Last done: ${lastDone || "unknown"}`,
-    target,
-    CLASSIFICATION_LABELS[classification]
-  ].join(" · ");
+function buildDetails(lastDone, targetDays, classification) {
+  const details = [{ label: "Last done", value: lastDone || "unknown" }];
+
+  if (targetDays !== null) {
+    details.push({
+      label: "Target",
+      value: `${targetDays} ${targetDays === 1 ? "day" : "days"}`
+    });
+  }
+  if (classification !== CLASSIFICATION.NORMAL) {
+    details.push({
+      label: "Status",
+      value: CLASSIFICATION_LABELS[classification]
+    });
+  }
+
+  return details;
 }
 
 export function normalizeApproachingRatio(value) {
@@ -100,7 +108,7 @@ export function getTimeSincePresentation(item, nowMs, approachingRatio) {
       elapsedMs: null,
       lastDone: null,
       targetDays,
-      tooltip: buildTooltip(null, targetDays, CLASSIFICATION.UNKNOWN)
+      details: buildDetails(null, targetDays, CLASSIFICATION.UNKNOWN)
     };
   }
 
@@ -119,6 +127,6 @@ export function getTimeSincePresentation(item, nowMs, approachingRatio) {
     classification,
     lastDone: item.last_done,
     targetDays,
-    tooltip: buildTooltip(item.last_done, targetDays, classification)
+    details: buildDetails(item.last_done, targetDays, classification)
   };
 }

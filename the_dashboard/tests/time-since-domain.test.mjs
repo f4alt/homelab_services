@@ -178,8 +178,8 @@ test("time-since normalizes valid items without changing their order", () => {
   assert.deepEqual(normalizeTimeSinceItems(null), []);
 });
 
-test("time-since tooltips expose exact timestamp, target, and classification", () => {
-  const known = getTimeSincePresentation(
+test("time-since details omit absent targets and normal status", () => {
+  const approaching = getTimeSincePresentation(
     trackedItem({
       last_done: "2026-07-31T12:00:00Z",
       target_days: 10
@@ -190,13 +190,29 @@ test("time-since tooltips expose exact timestamp, target, and classification", (
     trackedItem({ last_done: null, target_days: 1 }),
     NOW_MS
   );
-
-  assert.equal(
-    known.tooltip,
-    "Last done: 2026-07-31T12:00:00Z · Target: 10 days · Approaching"
+  const normalWithoutTarget = getTimeSincePresentation(
+    trackedItem({ last_done: "2026-08-07T12:00:00Z", target_days: null }),
+    NOW_MS
   );
-  assert.equal(
-    unknown.tooltip,
-    "Last done: unknown · Target: 1 day · Unknown"
+
+  assert.deepEqual(
+    approaching.details,
+    [
+      { label: "Last done", value: "2026-07-31T12:00:00Z" },
+      { label: "Target", value: "10 days" },
+      { label: "Status", value: "Approaching" }
+    ]
+  );
+  assert.deepEqual(
+    unknown.details,
+    [
+      { label: "Last done", value: "unknown" },
+      { label: "Target", value: "1 day" },
+      { label: "Status", value: "Unknown" }
+    ]
+  );
+  assert.deepEqual(
+    normalWithoutTarget.details,
+    [{ label: "Last done", value: "2026-08-07T12:00:00Z" }]
   );
 });

@@ -183,6 +183,41 @@ export function bindHoverPopup(trigger, popup) {
   return true;
 }
 
+export function createDismissalController({ containsTarget, onDismiss }) {
+  let active = false;
+
+  function deactivate() {
+    if (!active) return;
+
+    active = false;
+    document.removeEventListener("click", onDocumentClick);
+    document.removeEventListener("keydown", onDocumentKeydown);
+  }
+
+  function dismiss(restoreFocus) {
+    deactivate();
+    onDismiss({ restoreFocus });
+  }
+
+  function onDocumentClick(event) {
+    if (!containsTarget(event.target)) dismiss(false);
+  }
+
+  function onDocumentKeydown(event) {
+    if (event.key === "Escape") dismiss(true);
+  }
+
+  function activate() {
+    if (active) return;
+
+    active = true;
+    document.addEventListener("click", onDocumentClick);
+    document.addEventListener("keydown", onDocumentKeydown);
+  }
+
+  return Object.freeze({ activate, deactivate });
+}
+
 export function createDismissibleMenu({
   trigger,
   menu,
@@ -191,16 +226,13 @@ export function createDismissibleMenu({
 }) {
   let open = false;
   const floating = prepareFloatingPopup(trigger, menu);
-
-  function onDocumentClick(event) {
-    if (!containsTarget(event.target)) close();
-  }
-
-  function onDocumentKeydown(event) {
-    if (event.key !== "Escape") return;
-    close();
-    trigger.focus();
-  }
+  const dismissalController = createDismissalController({
+    containsTarget,
+    onDismiss: ({ restoreFocus }) => {
+      close();
+      if (restoreFocus) trigger.focus();
+    }
+  });
 
   function setOpen(nextOpen) {
     const next = Boolean(nextOpen);
@@ -212,13 +244,11 @@ export function createDismissibleMenu({
     if (open) {
       menu.classList.add("popup-menu-open");
       if (floating) menu.showPopover();
-      document.addEventListener("click", onDocumentClick);
-      document.addEventListener("keydown", onDocumentKeydown);
+      dismissalController.activate();
     } else {
       if (floating) menu.hidePopover();
       menu.classList.remove("popup-menu-open");
-      document.removeEventListener("click", onDocumentClick);
-      document.removeEventListener("keydown", onDocumentKeydown);
+      dismissalController.deactivate();
     }
 
     onOpenChange(open);

@@ -147,7 +147,7 @@ test("time-since uses the shared empty state for an empty collection", async () 
   );
 });
 
-test("time-since popup is anchored to and triggered only by the task name", async () => {
+test("time-since label flips the tile to conditional details and dismisses them", async () => {
   const approachingTimestamp = new Date(Date.now() - (8 * DAY_MS)).toISOString();
   const items = [
     {
@@ -158,17 +158,17 @@ test("time-since popup is anchored to and triggered only by the task name", asyn
       target_days: 10
     },
     {
-      uid: "unknown",
-      name: "Unknown activity",
+      uid: "normal",
+      name: "Normal activity",
       source_file: "home.org",
-      last_done: null,
+      last_done: NOW_ISO,
       target_days: null
     }
   ];
 
   await withTimeSinceWidget(
     async () => createSuccessResponse({ items }),
-    async ({ registration }) => {
+    async ({ fakeDocument, registration }) => {
       const state = registration.implementation.mount(new FakeElement("section"), {
         props: { approachingRatio: 0.8 }
       });
@@ -176,21 +176,15 @@ test("time-since popup is anchored to and triggered only by the task name", asyn
 
       const knownTile = state.grid.children[0];
       const knownButton = findByClass(knownTile, "time-since-reset-button");
-      const knownNameRegion = findByClass(knownTile, "time-since-name-region");
-      const knownName = findByClass(knownTile, "time-since-name");
-      const popup = findByClass(knownTile, "time-since-tooltip");
-      const unknownButton = findByClass(
+      const knownNameButton = findByClass(knownTile, "time-since-name-button");
+      const knownBack = findByClass(knownTile, "time-since-face--back");
+      const normalTile = state.grid.children[1];
+      const normalButton = findByClass(
         state.grid.children[1],
         "time-since-reset-button"
       );
+      const normalBack = findByClass(normalTile, "time-since-face--back");
 
-      assert.equal(knownTile.children[0], knownButton);
-      assert.equal(knownTile.classList.contains("popup-on-hover"), false);
-      assert.notEqual(knownNameRegion, null);
-      assert.equal(knownTile.children[1], knownNameRegion);
-      assert.equal(knownNameRegion.classList.contains("popup-on-hover"), true);
-      assert.equal(knownName.parentElement, knownNameRegion);
-      assert.equal(popup.parentElement, knownNameRegion);
       assert.equal(knownButton.tagName, "button");
       assert.equal(knownButton.textContent, "8");
       assert.equal(knownButton.classList.contains("clickable"), true);
@@ -199,30 +193,47 @@ test("time-since popup is anchored to and triggered only by the task name", asyn
         knownButton.classList.contains("time-since-age-token--approaching"),
         true
       );
-      assert.match(knownButton.getAttribute("aria-label"), /^Reset days for Known activity\./);
-      assert.equal(popup.classList.contains("popup"), true);
-      assert.equal(popup.classList.contains("popup--floating"), true);
-      assert.equal(popup.getAttribute("popover"), "manual");
-      assert.equal(popup.getAttribute("role"), "tooltip");
-      assert.match(popup.textContent, /Last done: .* · Target: 10 days · Approaching/);
-      knownNameRegion.fire("mouseenter");
-      assert.equal(popup.showPopoverCalls, 1);
-      knownNameRegion.fire("focusin");
-      assert.equal(popup.showPopoverCalls, 1);
-      knownNameRegion.fire("mouseleave");
-      assert.equal(popup.hidePopoverCalls, 0);
-      knownNameRegion.fire("focusout");
-      assert.equal(popup.hidePopoverCalls, 1);
-      knownNameRegion.fire("focusin");
-      assert.equal(popup.showPopoverCalls, 2);
-      knownNameRegion.fire("focusout");
-      assert.equal(popup.hidePopoverCalls, 2);
-      knownButton.fire("mouseenter");
-      assert.equal(popup.showPopoverCalls, 2);
-      assert.equal(unknownButton.textContent, "?");
-      assert.equal(unknownButton.classList.contains("time-since-age-token--unknown"), true);
+      assert.equal(knownNameButton.tagName, "button");
+      assert.equal(knownNameButton.textContent, "Known activity");
+      assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
+      assert.equal(knownTile.classList.contains("time-since-tile--flipped"), false);
+      assert.equal(findByClass(knownTile, "time-since-tooltip"), null);
+      assert.match(
+        treeText(knownBack),
+        /Last done\s+.*\s+Target\s+10 days\s+Status\s+Approaching/
+      );
+      assert.equal(treeText(normalBack).includes("Target"), false);
+      assert.equal(treeText(normalBack).includes("No target"), false);
+      assert.equal(treeText(normalBack).includes("Status"), false);
+      assert.equal(treeText(normalBack).includes("Normal"), false);
+      assert.equal(normalButton.classList.contains("time-since-age-token--normal"), true);
       assert.equal(treeText(state.grid).includes("Done now"), false);
       assert.equal(treeText(state.grid).includes("days since"), false);
+
+      knownNameButton.fire("click");
+      assert.equal(knownNameButton.getAttribute("aria-expanded"), "true");
+      assert.equal(knownTile.classList.contains("time-since-tile--flipped"), true);
+      assert.equal(knownBack.focusCalls, 1);
+      assert.equal(fakeDocument.listenerCount("click"), 1);
+      assert.equal(fakeDocument.listenerCount("keydown"), 1);
+
+      knownBack.fire("click");
+      assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
+      assert.equal(knownTile.classList.contains("time-since-tile--flipped"), false);
+      assert.equal(knownNameButton.focusCalls, 1);
+      assert.equal(fakeDocument.listenerCount("click"), 0);
+      assert.equal(fakeDocument.listenerCount("keydown"), 0);
+
+      knownNameButton.fire("click");
+      fakeDocument.fire("click", { target: new FakeElement("aside") });
+      assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
+      assert.equal(knownTile.classList.contains("time-since-tile--flipped"), false);
+
+      knownNameButton.fire("click");
+      fakeDocument.fire("keydown", { key: "Escape" });
+      assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
+      assert.equal(knownNameButton.focusCalls, 2);
+      assert.equal(fakeDocument.listenerCount("keydown"), 0);
     }
   );
 });
