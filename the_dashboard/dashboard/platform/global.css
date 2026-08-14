@@ -7,9 +7,9 @@
   --card: #1a1519;
   --card-border: #40343b;
   --ok: #a9d8c4;
-  --warn: #ffc107;
+  --warn: #ffff00;
   --warn-muted: #7a5e12;
-  --err: #f03e3e;
+  --err: #ff0000;
   --err-muted: #7a1e1e;
   --clickable-hover-border: color-mix(in srgb, var(--accent) 35%, transparent);
   --label-info: var(--muted);
