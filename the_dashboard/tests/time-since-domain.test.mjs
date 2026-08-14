@@ -4,7 +4,8 @@ import test from "node:test";
 import {
   getTimeSincePresentation,
   normalizeApproachingRatio,
-  normalizeTimeSinceItems
+  normalizeTimeSinceItems,
+  sortTimeSinceItemsByPriority
 } from "../dashboard/widgets/time-since-domain.js";
 
 const DAY_MS = 86_400_000;
@@ -109,6 +110,41 @@ test("time-since becomes overdue at the exact target boundary", () => {
   );
 
   assert.equal(presentation.classification, "overdue");
+});
+
+test("time-since priority order keeps declaration order within urgency tiers", () => {
+  const items = [
+    trackedItem({ uid: "normal-first", last_done: new Date(NOW_MS).toISOString() }),
+    trackedItem({ uid: "unknown", last_done: null }),
+    trackedItem({
+      uid: "overdue-first",
+      last_done: new Date(NOW_MS - (11 * DAY_MS)).toISOString(),
+      target_days: 10
+    }),
+    trackedItem({
+      uid: "approaching",
+      last_done: new Date(NOW_MS - (8 * DAY_MS)).toISOString(),
+      target_days: 10
+    }),
+    trackedItem({
+      uid: "overdue-second",
+      last_done: new Date(NOW_MS - (12 * DAY_MS)).toISOString(),
+      target_days: 10
+    }),
+    trackedItem({ uid: "normal-second", last_done: new Date(NOW_MS).toISOString() })
+  ];
+
+  assert.deepEqual(
+    sortTimeSinceItemsByPriority(items, NOW_MS).map((item) => item.uid),
+    [
+      "overdue-first",
+      "overdue-second",
+      "approaching",
+      "normal-first",
+      "unknown",
+      "normal-second"
+    ]
+  );
 });
 
 test("time-since urgency uses precise elapsed time rather than displayed days", () => {

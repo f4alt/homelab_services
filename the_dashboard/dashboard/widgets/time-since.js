@@ -11,17 +11,12 @@ import {
 import {
   getTimeSincePresentation,
   normalizeApproachingRatio,
-  normalizeTimeSinceItems
+  normalizeTimeSinceItems,
+  sortTimeSinceItemsByPriority
 } from "./time-since-domain.js";
 
 const ALL_SOURCES = "";
 const ALL_SOURCES_LABEL = "All";
-const CLASSIFICATION_PRIORITY = Object.freeze({
-  overdue: 0,
-  approaching: 1,
-  normal: 2,
-  unknown: 3
-});
 const TIME_SINCE_STYLE_ID = "time-since-widget-styles";
 
 const TIME_SINCE_STYLES = `
@@ -222,7 +217,7 @@ function renderDetails(container, details) {
   container.replaceChildren(...rows);
 }
 
-function createTileView(state, item) {
+function createTileView(state, item, nowMs) {
   const tile = createTile("time-since-tile");
   const flipper = createElement("div", "time-since-flipper");
   const front = createElement("div", "time-since-face time-since-face--front");
@@ -255,18 +250,18 @@ function createTileView(state, item) {
   });
   backButton.addEventListener("click", () => closeTileDetails(state, true));
   resetButton.addEventListener("click", () => completeNow(state, tileView.item));
-  updateTileView(state, tileView, item);
+  updateTileView(state, tileView, item, nowMs);
   return tileView;
 }
 
-function updateTileView(state, tileView, item) {
+function updateTileView(state, tileView, item, nowMs) {
   const pendingCompletion = state.pendingCompletions.get(item.uid);
   const presentedItem = pendingCompletion
     ? { ...item, last_done: pendingCompletion.optimisticLastDone }
     : item;
   const presentation = getTimeSincePresentation(
     presentedItem,
-    Date.now(),
+    nowMs,
     state.approachingRatio
   );
 
@@ -305,22 +300,8 @@ function replaceChildrenWhenChanged(container, children) {
   container.replaceChildren(...children);
 }
 
-function sortByPriority(items, nowMs, approachingRatio) {
-  return items
-    .map((item, declarationIndex) => ({
-      declarationIndex,
-      item,
-      priority: CLASSIFICATION_PRIORITY[
-        getTimeSincePresentation(item, nowMs, approachingRatio).classification
-      ]
-    }))
-    .sort((left, right) => (
-      left.priority - right.priority || left.declarationIndex - right.declarationIndex
-    ))
-    .map(({ item }) => item);
-}
-
 function render(state) {
+  const nowMs = Date.now();
   state.sources = availableSources(state.items);
   if (state.selectedSource && !state.sources.includes(state.selectedSource)) {
     state.selectedSource = ALL_SOURCES;
@@ -336,7 +317,7 @@ function render(state) {
     ? state.items.filter((item) => item.source_file === state.selectedSource)
     : state.items;
   const visibleItems = state.sortByPriority
-    ? sortByPriority(filteredItems, Date.now(), state.approachingRatio)
+    ? sortTimeSinceItemsByPriority(filteredItems, nowMs, state.approachingRatio)
     : filteredItems;
   const visibleUids = new Set(visibleItems.map((item) => item.uid));
 
@@ -358,10 +339,10 @@ function render(state) {
   for (const item of visibleItems) {
     let tileView = state.tileViews.get(item.uid);
     if (!tileView) {
-      tileView = createTileView(state, item);
+      tileView = createTileView(state, item, nowMs);
       state.tileViews.set(item.uid, tileView);
     } else {
-      updateTileView(state, tileView, item);
+      updateTileView(state, tileView, item, nowMs);
     }
     visibleTiles.push(tileView.tile);
   }
@@ -489,7 +470,6 @@ window.DASH.registerWidget("time-since", {
     const priorityLabel = createElement("label", "inline-toggle");
     const priorityInput = document.createElement("input");
     priorityInput.type = "checkbox";
-    priorityInput.checked = true;
     const priorityText = createElement("span", "", "priority");
     priorityLabel.append(priorityInput, priorityText);
 
@@ -519,6 +499,7 @@ window.DASH.registerWidget("time-since", {
       openTileView: null,
       detailsDismissal: null
     };
+    priorityInput.checked = state.sortByPriority;
 
     state.detailsDismissal = createDismissalController({
       containsTarget: (target) => Boolean(state.openTileView?.tile.contains(target)),

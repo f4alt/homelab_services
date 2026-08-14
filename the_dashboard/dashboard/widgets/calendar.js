@@ -187,7 +187,7 @@ const CALENDAR_STYLES = `
     @media (max-width: 420px) {
       .calendar-widget {
         --calendar-cell-height: calc(var(--space-md) + var(--space-comfortable));
-        --calendar-day-number-size: calc(var(--space-sm) + var(--space-sm));
+        --calendar-day-number-size: calc(var(--space-sm) + var(--space-control));
         --calendar-day-number-font-size: 10px;
         --tile-padding: var(--space-compact);
       }

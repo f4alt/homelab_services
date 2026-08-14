@@ -13,6 +13,10 @@ const CLASSIFICATION_LABELS = Object.freeze({
   [CLASSIFICATION.OVERDUE]: "Overdue",
   [CLASSIFICATION.UNKNOWN]: "Unknown"
 });
+const PRIORITY_CLASSIFICATIONS = Object.freeze([
+  CLASSIFICATION.OVERDUE,
+  CLASSIFICATION.APPROACHING
+]);
 
 function parseLastDone(value) {
   if (typeof value !== "string") return null;
@@ -95,6 +99,29 @@ export function normalizeTimeSinceItems(items) {
   }
 
   return normalizedItems;
+}
+
+export function sortTimeSinceItemsByPriority(items, nowMs, approachingRatio) {
+  return items
+    .map((item, declarationIndex) => {
+      const classification = getTimeSincePresentation(
+        item,
+        nowMs,
+        approachingRatio
+      ).classification;
+      const classificationIndex = PRIORITY_CLASSIFICATIONS.indexOf(classification);
+      return {
+        declarationIndex,
+        item,
+        priority: classificationIndex === -1
+          ? PRIORITY_CLASSIFICATIONS.length
+          : classificationIndex
+      };
+    })
+    .sort((left, right) => (
+      left.priority - right.priority || left.declarationIndex - right.declarationIndex
+    ))
+    .map(({ item }) => item);
 }
 
 export function getTimeSincePresentation(item, nowMs, approachingRatio) {
