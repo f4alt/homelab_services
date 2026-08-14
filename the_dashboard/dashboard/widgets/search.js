@@ -7,6 +7,9 @@ import {
 const SEARCH_STYLE_ID = "search-widget-styles";
 const SEARCH_STYLES = `
     .search-pill {
+      --tile-box-shadow: var(--shadow-surface-raised);
+      --tile-padding: 0;
+
       position: relative;
       display: flex;
       align-items: stretch;
@@ -72,7 +75,7 @@ window.DASH.registerWidget("search", {
     let currentEngineIndex = 0;
     const wrapper = createStack();
     const pill = document.createElement("div");
-    pill.className = "surface-control search-pill";
+    pill.className = "ui-tile search-pill";
 
     const input = document.createElement("input");
     input.className = "input-basic search-input";

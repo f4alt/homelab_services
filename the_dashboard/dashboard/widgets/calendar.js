@@ -84,8 +84,8 @@ const CALENDAR_STYLES = `
     }
 
     .calendar-day--selected {
-      background: rgba(var(--ok-rgb), .13);
-      border-color: rgba(var(--ok-rgb), .55);
+      background: color-mix(in srgb, var(--ok) 13%, transparent);
+      border-color: color-mix(in srgb, var(--ok) 55%, transparent);
       opacity: 1;
     }
 
@@ -103,7 +103,7 @@ const CALENDAR_STYLES = `
 
     .calendar-day--today .calendar-day-number {
       border-color: var(--ok);
-      box-shadow: 0 0 8px rgba(var(--ok-rgb), .28);
+      box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 28%, transparent);
     }
 
     .calendar-day-dot {
@@ -150,13 +150,13 @@ const CALENDAR_STYLES = `
     }
 
     .calendar-countdown--today .popup {
-      border-color: rgba(var(--ok-rgb), .5);
-      box-shadow: 0 10px 24px rgba(var(--ok-rgb), .25);
+      border-color: color-mix(in srgb, var(--ok) 50%, transparent);
+      box-shadow: 0 10px 24px color-mix(in srgb, var(--ok) 25%, transparent);
     }
 
     .calendar-countdown--overdue .popup {
-      border-color: rgba(var(--err-rgb), .4);
-      box-shadow: 0 10px 24px rgba(var(--err-rgb), .3);
+      border-color: color-mix(in srgb, var(--err) 40%, transparent);
+      box-shadow: 0 10px 24px color-mix(in srgb, var(--err) 30%, transparent);
     }
 
     .calendar-event-list {

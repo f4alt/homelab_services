@@ -71,7 +71,7 @@ function renderMenu(state) {
   for (const key of state.lists) {
     const item = document.createElement("button");
     item.type = "button";
-    item.className = "clickable popup-menu-item todos-menu-item";
+    item.className = "clickable popup-menu-item";
     item.textContent = listName(key);
     item.title = key;
     item.setAttribute("role", "option");
@@ -96,11 +96,11 @@ function createTaskButton(state, task) {
     `${task.content} is ${task.status.toLowerCase()}. Mark ${nextStatus.toLowerCase()}.`
   );
 
-  const dotClass = `dot todos-dot ${task.status === "DONE" ? "dot--done dot--inset" : ""}`.trim();
+  const dotClass = `dot todos-dot ${task.status === "DONE" ? "dot--ok dot--inset" : ""}`.trim();
   const dot = createElement("span", dotClass);
   dot.setAttribute("aria-hidden", "true");
 
-  const text = createElement("span", "label-info todos-text", task.content.trim());
+  const text = createElement("span", "label-info", task.content.trim());
   button.append(dot, text);
 
   button.addEventListener("click", async () => {
@@ -185,27 +185,27 @@ window.DASH.registerWidget("todos", {
 
     const shell = createElement("div", "widget-body");
     const header = createElement("div", "widget-header");
-    const picker = createElement("div", "todos-list-picker");
+    const picker = createElement("div");
     const listButton = document.createElement("button");
     listButton.type = "button";
-    listButton.className = "menu-button todos-list-button";
+    listButton.className = "menu-button";
     listButton.setAttribute("aria-haspopup", "listbox");
     listButton.setAttribute("aria-expanded", "false");
 
     const currentName = createElement("span", "truncate", "todos");
     listButton.append(currentName);
 
-    const menu = createElement("div", "popup popup-menu todos-menu");
+    const menu = createElement("div", "popup popup-menu");
     menu.setAttribute("role", "listbox");
     picker.append(listButton, menu);
 
-    const showAllLabel = createElement("label", "inline-toggle todos-show-all");
+    const showAllLabel = createElement("label", "inline-toggle");
     const showAllInput = document.createElement("input");
     showAllInput.type = "checkbox";
     const showAllText = createElement("span", "", "show all");
     showAllLabel.append(showAllInput, showAllText);
 
-    const list = createElement("div", "list-scroll todos-list");
+    const list = createElement("div", "list-scroll");
     header.append(picker, showAllLabel);
     shell.append(header, list);
     root.replaceChildren(shell);

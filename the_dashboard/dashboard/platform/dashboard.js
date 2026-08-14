@@ -26,7 +26,7 @@ function renderMessage(grid, { title, lines = [], className = "" }) {
 }
 
 function renderWidgetError(element, message) {
-  element.classList.add("error");
+  element.classList.add("severity-error");
   element.replaceChildren();
 
   const heading = document.createElement("div");
@@ -99,7 +99,7 @@ async function startDashboard() {
     renderMessage(grid, {
       title: "Dashboard configuration error",
       lines: validation.errors,
-      className: "error"
+      className: "severity-error"
     });
     return;
   }

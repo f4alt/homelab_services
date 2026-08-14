@@ -51,7 +51,7 @@ const NETSTATS_STYLES = `
 
 function createMetricRow(label, value = "-", tagName = "div") {
   const childTag = tagName === "span" ? "span" : "div";
-  const row = createElement(tagName, "metric-row metric-row--nowrap");
+  const row = createElement(tagName, "metric-row");
   const labelElement = createElement(childTag, "label", label);
   const valueElement = createElement(childTag, "label-info", value);
   row.append(labelElement, valueElement);
@@ -66,7 +66,7 @@ function createStatus() {
 }
 
 function setAvailability(surface, status, stale, message = "") {
-  surface.classList.toggle("warn", stale);
+  surface.classList.toggle("severity-warn", stale);
   status.textContent = message;
 }
 
@@ -331,7 +331,7 @@ window.DASH.registerWidget("netstats", {
 
     const chartWrap = document.createElement("button");
     chartWrap.type = "button";
-    chartWrap.className = "net-chart-wrap netstats-chart-button clickable";
+    chartWrap.className = "netstats-chart-button clickable";
     chartWrap.setAttribute("aria-busy", "false");
     const svg = document.createElementNS(SVG_NAMESPACE, "svg");
     svg.classList.add("net-chart");

@@ -148,7 +148,7 @@ function renderMenu(state) {
     for (const sourceFile of menuSources) {
       const menuItem = document.createElement("button");
       menuItem.type = "button";
-      menuItem.className = "clickable popup-menu-item time-since-menu-item";
+      menuItem.className = "clickable popup-menu-item";
       menuItem.textContent = sourceFile || ALL_SOURCES_LABEL;
       menuItem.title = sourceFile || ALL_SOURCES_LABEL;
       menuItem.setAttribute("role", "option");
@@ -286,7 +286,6 @@ function updateTileView(state, tileView, item) {
     "clickable--compact",
     "value-large",
     "time-since-reset-button",
-    "time-since-age-token",
     `time-since-age-token--${presentation.classification}`
   ].join(" ");
   tileView.resetButton.textContent = presentation.ageToken;
@@ -450,23 +449,23 @@ window.DASH.registerWidget("time-since", {
   mount(root, { props = {} }) {
     installWidgetStyles(TIME_SINCE_STYLE_ID, TIME_SINCE_STYLES);
 
-    const shell = createElement("div", "widget-body time-since-widget");
+    const shell = createElement("div", "widget-body");
     const header = createElement("div", "widget-header");
-    const picker = createElement("div", "time-since-source-picker");
+    const picker = createElement("div");
     const sourceButton = document.createElement("button");
     sourceButton.type = "button";
-    sourceButton.className = "menu-button time-since-source-button";
+    sourceButton.className = "menu-button";
     sourceButton.setAttribute("aria-haspopup", "listbox");
     sourceButton.setAttribute("aria-expanded", "false");
 
     const currentSource = createElement("span", "truncate", ALL_SOURCES_LABEL);
     sourceButton.appendChild(currentSource);
 
-    const menu = createElement("div", "popup popup-menu time-since-menu");
+    const menu = createElement("div", "popup popup-menu");
     menu.setAttribute("role", "listbox");
     picker.append(sourceButton, menu);
 
-    const list = createElement("div", "list-scroll time-since-list");
+    const list = createElement("div", "list-scroll");
     const grid = createResponsiveGrid(props);
     list.appendChild(grid);
     header.appendChild(picker);
