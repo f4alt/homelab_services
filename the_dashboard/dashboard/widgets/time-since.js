@@ -25,7 +25,6 @@ const TIME_SINCE_STYLES = `
       --time-since-flip-perspective: 48rem;
 
       perspective: var(--time-since-flip-perspective);
-      cursor: pointer;
       text-align: center;
     }
 
@@ -74,18 +73,14 @@ const TIME_SINCE_STYLES = `
     }
 
     .time-since-name-button {
-      appearance: none;
-      background: transparent;
-      border: 0;
       max-width: 100%;
       min-width: 0;
-      padding: 0;
       text-align: center;
     }
 
-    .time-since-name-button:is(:hover, :focus-visible) {
-      text-decoration: underline;
-      text-underline-offset: var(--space-xs);
+    .time-since-face--back:focus:not(:focus-visible),
+    .time-since-name-button:focus:not(:focus-visible) {
+      outline: none;
     }
 
     .time-since-details {
@@ -224,7 +219,14 @@ function createTileView(state, item, nowMs) {
   const front = createElement("div", "time-since-face time-since-face--front");
   const nameButton = document.createElement("button");
   nameButton.type = "button";
-  nameButton.className = "label truncate time-since-name time-since-name-button";
+  nameButton.className = [
+    "clickable",
+    "clickable--compact",
+    "label",
+    "truncate",
+    "time-since-name",
+    "time-since-name-button"
+  ].join(" ");
   const resetButton = document.createElement("button");
   resetButton.type = "button";
   const backButton = document.createElement("button");
@@ -246,23 +248,11 @@ function createTileView(state, item, nowMs) {
     resetButton,
     item
   };
-  const toggleDetails = () => {
+  nameButton.addEventListener("click", () => {
     setOpenTileView(state, state.openTileView === tileView ? null : tileView);
-  };
-  tile.addEventListener("click", toggleDetails);
-  nameButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    toggleDetails();
   });
-  backButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    closeTileDetails(state, true);
-  });
-  resetButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    setOpenTileView(state, tileView);
-    return completeNow(state, tileView.item);
-  });
+  backButton.addEventListener("click", () => closeTileDetails(state, true));
+  resetButton.addEventListener("click", () => completeNow(state, tileView.item));
   updateTileView(state, tileView, item, nowMs);
   return tileView;
 }
