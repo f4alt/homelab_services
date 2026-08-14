@@ -9,16 +9,6 @@ const POPUP_ANCHOR_SUPPORT_QUERIES = Object.freeze([
 ]);
 let nextPopupAnchorIndex = 0;
 
-export function apiBase() {
-  return (window.DASH_CONFIG?.apiBase ?? "").replace(/\/+$/, "");
-}
-
-export function apiUrl(path) {
-  const base = apiBase();
-  const cleanPath = String(path || "").replace(/^\/+/, "");
-  return cleanPath ? `${base}/${cleanPath}` : base;
-}
-
 export async function fetchJson(pathOrUrl, options = {}) {
   const {
     timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
@@ -35,10 +25,12 @@ export async function fetchJson(pathOrUrl, options = {}) {
     callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
   }
   const rawUrl = String(pathOrUrl);
-  const base = apiBase();
+  const base = (window.DASH_CONFIG?.apiBase ?? "").replace(/\/+$/, "");
   const isAbsolute = /^https?:\/\//i.test(rawUrl);
   const isApiRootRelative = base && rawUrl.startsWith(`${base}/`);
-  const url = isAbsolute || isApiRootRelative ? rawUrl : apiUrl(rawUrl);
+  const cleanPath = rawUrl.replace(/^\/+/, "");
+  const joinedUrl = cleanPath ? `${base}/${cleanPath}` : base;
+  const url = isAbsolute || isApiRootRelative ? rawUrl : joinedUrl;
 
   try {
     const response = await fetch(url, {
@@ -267,24 +259,4 @@ export function createDismissibleMenu({
     open: () => setOpen(true),
     toggle: () => setOpen(!open)
   });
-}
-
-export function createStyledIcon(icon) {
-  const iconBox = createElement("div", "icon");
-
-  if (!icon) {
-    iconBox.textContent = "-";
-    return iconBox;
-  }
-
-  if (String(icon).startsWith("/") || String(icon).startsWith("http")) {
-    const img = document.createElement("img");
-    img.src = icon;
-    img.alt = "icon";
-    iconBox.appendChild(img);
-    return iconBox;
-  }
-
-  iconBox.textContent = icon;
-  return iconBox;
 }

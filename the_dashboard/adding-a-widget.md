@@ -55,9 +55,8 @@ widgets for the same concept.
 
 Current reusable JavaScript primitives include:
 
-- `apiBase()`, `apiUrl()`, and `fetchJson()` for same-origin Gateway calls and
-  the standard response envelope; `fetchJson()` combines its timeout with an
-  optional caller cancellation signal
+- `fetchJson()` for same-origin Gateway calls and the standard response
+  envelope; it combines its timeout with an optional caller cancellation signal
 - `createElement()` and `createWidgetMessage()` for safe, concise DOM
   construction
 - `setStateMessage()` for loading, empty, and recoverable error states
@@ -67,7 +66,6 @@ Current reusable JavaScript primitives include:
 - `createDismissibleMenu()` for per-instance popup state, ARIA expansion,
   temporary outside-click/Escape listeners, and focus return
 - `bindHoverPopup()` for hover/focus tooltip state and top-layer positioning
-- `createStyledIcon()` for text, emoji, or image icons
 
 Current reusable CSS covers widget and tile surfaces, tiled/full-width/scrolling
 lists, headers, split panels, metric rows, state and severity colors, clickable

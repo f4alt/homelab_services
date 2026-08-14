@@ -1,7 +1,7 @@
 import {
   bindHoverPopup,
+  createElement,
   createResponsiveGrid,
-  createStyledIcon,
   fetchJson,
   installWidgetStyles,
   setStateMessage
@@ -38,6 +38,26 @@ async function tryStatusChecks(services, signal) {
 function linkForTarget(target) {
   const value = String(target || "");
   return /^https?:\/\//i.test(value) ? value : `http://${value}`;
+}
+
+function createStyledIcon(icon) {
+  const iconBox = createElement("div", "icon");
+
+  if (!icon) {
+    iconBox.textContent = "-";
+    return iconBox;
+  }
+
+  if (String(icon).startsWith("/") || String(icon).startsWith("http")) {
+    const img = document.createElement("img");
+    img.src = icon;
+    img.alt = "icon";
+    iconBox.appendChild(img);
+    return iconBox;
+  }
+
+  iconBox.textContent = icon;
+  return iconBox;
 }
 
 window.DASH.registerWidget("status", {
