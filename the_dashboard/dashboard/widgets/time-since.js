@@ -16,6 +16,12 @@ import {
 
 const ALL_SOURCES = "";
 const ALL_SOURCES_LABEL = "All";
+const CLASSIFICATION_PRIORITY = Object.freeze({
+  overdue: 0,
+  approaching: 1,
+  normal: 2,
+  unknown: 3
+});
 const TIME_SINCE_STYLE_ID = "time-since-widget-styles";
 
 const TIME_SINCE_STYLES = `
@@ -58,7 +64,6 @@ const TIME_SINCE_STYLES = `
       background: transparent;
       border: 0;
       color: inherit;
-      cursor: pointer;
       display: grid;
       padding: 0;
       text-align: left;
@@ -76,7 +81,6 @@ const TIME_SINCE_STYLES = `
       appearance: none;
       background: transparent;
       border: 0;
-      cursor: pointer;
       max-width: 100%;
       min-width: 0;
       padding: 0;
@@ -119,7 +123,6 @@ const TIME_SINCE_STYLES = `
 
     .time-since-reset-button:disabled {
       color: var(--muted);
-      cursor: wait;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -148,7 +151,7 @@ function renderMenu(state) {
     for (const sourceFile of menuSources) {
       const menuItem = document.createElement("button");
       menuItem.type = "button";
-      menuItem.className = "clickable popup-menu-item";
+      menuItem.className = "popup-menu-item clickable label";
       menuItem.textContent = sourceFile || ALL_SOURCES_LABEL;
       menuItem.title = sourceFile || ALL_SOURCES_LABEL;
       menuItem.setAttribute("role", "option");
@@ -302,6 +305,21 @@ function replaceChildrenWhenChanged(container, children) {
   container.replaceChildren(...children);
 }
 
+function sortByPriority(items, nowMs, approachingRatio) {
+  return items
+    .map((item, declarationIndex) => ({
+      declarationIndex,
+      item,
+      priority: CLASSIFICATION_PRIORITY[
+        getTimeSincePresentation(item, nowMs, approachingRatio).classification
+      ]
+    }))
+    .sort((left, right) => (
+      left.priority - right.priority || left.declarationIndex - right.declarationIndex
+    ))
+    .map(({ item }) => item);
+}
+
 function render(state) {
   state.sources = availableSources(state.items);
   if (state.selectedSource && !state.sources.includes(state.selectedSource)) {
@@ -314,9 +332,12 @@ function render(state) {
 
   state.grid.classList.remove("is-loading", "is-empty", "is-error");
 
-  const visibleItems = state.selectedSource
+  const filteredItems = state.selectedSource
     ? state.items.filter((item) => item.source_file === state.selectedSource)
     : state.items;
+  const visibleItems = state.sortByPriority
+    ? sortByPriority(filteredItems, Date.now(), state.approachingRatio)
+    : filteredItems;
   const visibleUids = new Set(visibleItems.map((item) => item.uid));
 
   if (state.openTileView && !visibleUids.has(state.openTileView.item.uid)) {
@@ -465,10 +486,17 @@ window.DASH.registerWidget("time-since", {
     menu.setAttribute("role", "listbox");
     picker.append(sourceButton, menu);
 
+    const priorityLabel = createElement("label", "inline-toggle");
+    const priorityInput = document.createElement("input");
+    priorityInput.type = "checkbox";
+    priorityInput.checked = true;
+    const priorityText = createElement("span", "", "priority");
+    priorityLabel.append(priorityInput, priorityText);
+
     const list = createElement("div", "list-scroll");
     const grid = createResponsiveGrid(props);
     list.appendChild(grid);
-    header.appendChild(picker);
+    header.append(picker, priorityLabel);
     shell.append(header, list);
     root.replaceChildren(shell);
 
@@ -481,6 +509,7 @@ window.DASH.registerWidget("time-since", {
       items: [],
       sources: [],
       selectedSource: ALL_SOURCES,
+      sortByPriority: true,
       loadPromise: null,
       reloadRequested: false,
       menuSources: [],
@@ -502,6 +531,10 @@ window.DASH.registerWidget("time-since", {
       containsTarget: (target) => shell.contains(target)
     });
     sourceButton.addEventListener("click", () => state.menuController.toggle());
+    priorityInput.addEventListener("change", () => {
+      state.sortByPriority = priorityInput.checked;
+      render(state);
+    });
     setStateMessage(grid, "Loading tracked activities...", "loading");
     return state;
   },

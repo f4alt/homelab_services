@@ -33,7 +33,7 @@ const CALENDAR_STYLES = `
       --calendar-cell-height: calc(
         var(--space-comfortable) + var(--space-comfortable)
       );
-      --calendar-day-number-size: calc(var(--space-sm) + var(--space-control));
+      --calendar-day-number-size: calc(var(--space-sm) + var(--space-md));
       --calendar-day-number-font-size: 11px;
       --progress-height: var(--space-compact);
       --tile-padding: var(--space-sm);

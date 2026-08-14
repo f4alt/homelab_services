@@ -13,6 +13,7 @@ const SEARCH_STYLES = `
       position: relative;
       display: flex;
       align-items: stretch;
+      cursor: text;
       width: 100%;
       isolation: isolate;
       overflow: visible; /* allow the engine menu to escape the pill */
@@ -33,6 +34,7 @@ const SEARCH_STYLES = `
     }
 
     .search-engine-btn {
+      cursor: default;
       flex: 0 0 auto;
       border-left: 1px solid var(--tile-border);
       border-radius: 0 var(--radius) var(--radius) 0;
@@ -103,15 +105,11 @@ window.DASH.registerWidget("search", {
 
     const menuItems = engines.map((engine, engineIndex) => {
       const item = document.createElement("button");
-      item.className = "clickable popup-menu-item";
+      item.className = "popup-menu-item clickable label";
       item.type = "button";
       item.setAttribute("role", "option");
       item.setAttribute("aria-selected", String(engineIndex === currentEngineIndex));
-
-      const name = document.createElement("span");
-      name.className = "label";
-      name.textContent = engine.name;
-      item.appendChild(name);
+      item.textContent = engine.name;
 
       item.addEventListener("click", (event) => {
         event.stopPropagation();

@@ -20,8 +20,25 @@ const NETSTATS_STYLES = `
     }
 
     .net-chart {
-      height: 110px;
+      display: block;
+      height: 100%;
+      min-height: var(--netstats-chart-min-height);
       width: 100%;
+    }
+
+    .netstats-layout {
+      --netstats-chart-min-height: 110px;
+
+      flex: 1 1 auto;
+    }
+
+    .netstats-sidebar {
+      align-self: center;
+    }
+
+    .netstats-main {
+      display: flex;
+      flex-direction: column;
     }
 
     .netstats-graph-labels {
@@ -39,8 +56,16 @@ const NETSTATS_STYLES = `
     }
 
     .netstats-chart-button {
+      flex: 1 1 var(--netstats-chart-min-height);
+      min-height: var(--netstats-chart-min-height);
       position: relative;
       width: 100%;
+    }
+
+    @media (max-width: 720px) {
+      .netstats-sidebar {
+        align-self: stretch;
+      }
     }
 
     .netstats-status {
@@ -286,9 +311,9 @@ window.DASH.registerWidget("netstats", {
       startPaused: props?.startPaused === true
     };
     const wrap = document.createElement("div");
-    wrap.className = "panel-split";
+    wrap.className = "panel-split netstats-layout";
     const left = document.createElement("div");
-    left.className = "panel-sidebar";
+    left.className = "panel-sidebar netstats-sidebar";
 
     const { row: ipRow, valueElement: ipValue } = createMetricRow("Public IP", "—");
     const ipStatus = createStatus();
@@ -318,7 +343,7 @@ window.DASH.registerWidget("netstats", {
     left.append(ipRow, ipStatus, speedBlock);
 
     const right = document.createElement("div");
-    right.className = "panel-main";
+    right.className = "panel-main netstats-main";
     const labels = document.createElement("div");
     labels.className = "netstats-graph-labels";
     const title = document.createElement("div");

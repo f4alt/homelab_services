@@ -124,6 +124,9 @@ test("search exposes one dismissible listbox and preserves engine selection and 
     assert.equal(engineButton.getAttribute("aria-haspopup"), "listbox");
     assert.equal(engineButton.getAttribute("aria-expanded"), "false");
     assert.equal(menu.getAttribute("role"), "listbox");
+    assert.equal(firstItem.className, "popup-menu-item clickable label");
+    assert.equal(firstItem.children.length, 0);
+    assert.equal(firstItem.textContent, "First");
     assert.equal(firstItem.getAttribute("aria-selected"), "true");
     assert.equal(secondItem.getAttribute("aria-selected"), "false");
     assert.equal(fakeDocument.listenerCount("click"), 0);
@@ -208,6 +211,12 @@ test("todos installs dismissal listeners only while its list picker is open", as
     await registration.implementation.update(instance);
     assert.equal(instance.selectedList, "alpha.org");
     assert.equal(instance.menu.children.length, 2);
+    assert.equal(
+      instance.menu.children.every((item) => (
+        item.className === "popup-menu-item clickable label"
+      )),
+      true
+    );
 
     instance.listButton.fire("click");
     assert.equal(instance.listButton.getAttribute("aria-expanded"), "true");

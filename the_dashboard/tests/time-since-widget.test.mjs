@@ -91,10 +91,87 @@ test("time-since renders ordered tiles inside a height-capped responsive grid", 
       ["Change the AC filter", "Test the backup restore"]
     );
     assert.equal(state.grid.children.every((tile) => tile.classList.contains("ui-tile")), true);
+    assert.equal(
+      state.menu.children.every((item) => (
+        item.className === "popup-menu-item clickable label"
+      )),
+      true
+    );
     assert.equal(treeText(state.grid).includes("home.org"), false);
     assert.equal(treeText(state.grid).includes("homelab.org"), false);
     assert.deepEqual(requests, ["/api/todos/time-since"]);
   });
+});
+
+test("time-since sorts by urgency by default and restores declaration order when disabled", async () => {
+  const timestampDaysAgo = (days) => new Date(Date.now() - (days * DAY_MS)).toISOString();
+  const items = [
+    {
+      uid: "normal-first",
+      name: "Normal first",
+      source_file: "home.org",
+      last_done: timestampDaysAgo(1),
+      target_days: 10
+    },
+    {
+      uid: "overdue-first",
+      name: "Overdue first",
+      source_file: "home.org",
+      last_done: timestampDaysAgo(11),
+      target_days: 10
+    },
+    {
+      uid: "approaching",
+      name: "Approaching",
+      source_file: "home.org",
+      last_done: timestampDaysAgo(8),
+      target_days: 10
+    },
+    {
+      uid: "overdue-second",
+      name: "Overdue second",
+      source_file: "home.org",
+      last_done: timestampDaysAgo(12),
+      target_days: 10
+    },
+    {
+      uid: "normal-second",
+      name: "Normal second",
+      source_file: "home.org",
+      last_done: timestampDaysAgo(2),
+      target_days: 10
+    }
+  ];
+
+  await withTimeSinceWidget(
+    async () => createSuccessResponse({ items }),
+    async ({ registration }) => {
+      const root = new FakeElement("section");
+      const state = registration.implementation.mount(root, { props: {} });
+      await registration.implementation.update(state);
+
+      const tileNames = () => state.grid.children.map(
+        (tile) => findByClass(tile, "time-since-name").textContent
+      );
+      const priorityToggle = findByClass(root, "inline-toggle");
+      const priorityInput = priorityToggle.children[0];
+
+      assert.equal(priorityInput.type, "checkbox");
+      assert.equal(priorityInput.checked, true);
+      assert.deepEqual(tileNames(), [
+        "Overdue first",
+        "Overdue second",
+        "Approaching",
+        "Normal first",
+        "Normal second"
+      ]);
+
+      priorityInput.checked = false;
+      priorityInput.fire("change");
+
+      assert.deepEqual(tileNames(), items.map((item) => item.name));
+    }
+  );
 });
 
 test("time-since source filtering is local", async () => {

@@ -71,7 +71,7 @@ function renderMenu(state) {
   for (const key of state.lists) {
     const item = document.createElement("button");
     item.type = "button";
-    item.className = "clickable popup-menu-item";
+    item.className = "popup-menu-item clickable label";
     item.textContent = listName(key);
     item.title = key;
     item.setAttribute("role", "option");

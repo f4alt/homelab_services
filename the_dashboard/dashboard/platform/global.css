@@ -350,7 +350,6 @@ button.clickable {
   border: 1px solid transparent;
   border-radius: var(--radius);
   color: var(--fg);
-  cursor: pointer;
   display: flex;
   font: inherit;
   font-size: 13px;
@@ -413,7 +412,6 @@ button.clickable {
 .inline-toggle {
   align-items: center;
   color: var(--label-info);
-  cursor: pointer;
   display: flex;
   flex: 0 0 auto;
   font-size: 12px;
@@ -542,14 +540,12 @@ button.clickable {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: default;
 }
 
 .label-info {
   font-size: 12px;
   color: var(--label-info);
   line-height: 1.2;
-  cursor: default;
 }
 
 .value-large {
