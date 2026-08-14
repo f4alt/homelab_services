@@ -51,7 +51,7 @@ function applyGrid(gridElement, options) {
   const gridOptions = options?.grid ?? {};
 
   if (Number.isFinite(gridOptions.gap))
-    gridElement.style.setProperty("--grid-gap", `${gridOptions.gap}px`);
+    gridElement.style.setProperty("--grid-column-gap", `${gridOptions.gap}px`);
  
   if (Number.isFinite(gridOptions.minColWidth))
     gridElement.style.setProperty("--grid-min-col", `${gridOptions.minColWidth}px`);

@@ -12,7 +12,7 @@ const SEARCH_STYLES = `
       align-items: stretch;
       width: 100%;
       isolation: isolate;
-      overflow: visible; /* let the glow shadow breathe */
+      overflow: visible; /* allow the engine menu to escape the pill */
     }
 
     .widget.search-menu-open {
@@ -21,12 +21,8 @@ const SEARCH_STYLES = `
     }
 
     .search-pill-active {
-      border-color: rgba(var(--ok-rgb), 0.8);
-      box-shadow:
-        0 0 4px 1px rgba(var(--ok-rgb), 0.6),
-        0 0 12px 4px rgba(var(--ok-rgb), 0.25),
-        0 0 28px 12px rgba(var(--ok-rgb), 0.12),
-        0 4px 24px rgba(var(--card-shadow), .25);
+      border-color: var(--search-active-border);
+      box-shadow: var(--search-active-shadow);
     }
 
     .search-input {

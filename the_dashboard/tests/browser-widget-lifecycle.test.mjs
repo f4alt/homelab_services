@@ -6,6 +6,12 @@ import { withPatchedGlobals } from "./helpers/test-utils.mjs";
 
 test("the shell only calls and schedules widgets that implement update", async () => {
   const grid = new FakeElement("main");
+  const gridProperties = new Map();
+  grid.style = {
+    setProperty(name, value) {
+      gridProperties.set(name, String(value));
+    }
+  };
   let onDomContentLoaded;
   let intervalCalls = 0;
   let mountCalls = 0;
@@ -23,6 +29,7 @@ test("the shell only calls and schedules widgets that implement update", async (
     window: {
       DASH_CONFIG: {
         apiBase: "/api",
+        options: { grid: { gap: 34 } },
         widgets: [
           { id: "static_test", type: "static_test", refreshMs: 1000 },
           { id: "updating_test", type: "updating_test", refreshMs: 1000 }
@@ -55,6 +62,8 @@ test("the shell only calls and schedules widgets that implement update", async (
     assert.equal(mountCalls, 2);
     assert.equal(updateCalls, 1);
     assert.equal(intervalCalls, 1);
+    assert.equal(gridProperties.get("--grid-column-gap"), "34px");
+    assert.equal(gridProperties.has("--grid-gap"), false);
   });
 });
 

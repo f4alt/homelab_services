@@ -3,10 +3,10 @@ window.DASH_CONFIG = {
 
   options: {
     grid: {
-      columns: "2",
+      columns: 12,
       minColWidth: 280,
-      gap: 12,
-      width: "1600px"
+      gap: 34,
+      width: "1420px"
     }
   },
 
@@ -33,7 +33,7 @@ window.DASH_CONFIG = {
     {
       type: "clocks",
       id: "clocks",
-      width: 1,
+      width: 7,
       refreshMs: 0,
       props: {
         tileMinWidth: 200,
@@ -48,10 +48,25 @@ window.DASH_CONFIG = {
     {
       type: "calendar",
       id: "calendar",
-      width: 1,
+      width: 5,
       refreshMs: 300000,
       props: {
         feedUrl: ""
+      }
+    },
+    {
+      type: "todos",
+      id: "todos",
+      width: 5,
+      refreshMs: 60000
+    },
+    {
+      type: "time-since",
+      id: "time_since",
+      width: 7,
+      refreshMs: 60000,
+      props: {
+        approachingRatio: 0.8
       }
     },
     {
@@ -63,7 +78,7 @@ window.DASH_CONFIG = {
     {
       type: "status",
       id: "status",
-      width: 1,
+      width: 5,
       refreshMs: 30000,
       props: {
         services: []
@@ -72,27 +87,12 @@ window.DASH_CONFIG = {
     {
       type: "netstats",
       id: "netstats",
-      width: 1,
+      width: 7,
       refreshMs: 0,
       props: {
         ipRefreshMs: 600000,
         pingIntervalMs: 5000,
         maxSamples: 60
-      }
-    },
-    {
-      type: "todos",
-      id: "todos",
-      width: 1,
-      refreshMs: 60000
-    },
-    {
-      type: "time-since",
-      id: "time_since",
-      width: 1,
-      refreshMs: 60000,
-      props: {
-        approachingRatio: 0.8
       }
     },
     {

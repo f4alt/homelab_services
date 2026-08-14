@@ -31,3 +31,30 @@ test("tracked dashboard config uses camelCase property keys", async () => {
 
   assert.deepEqual(collectUnderscoredKeys(config), []);
 });
+
+test("tracked dashboard config preserves the wide layout rhythm", async () => {
+  const config = await loadTrackedConfig();
+
+  assert.deepEqual(
+    Array.from(config.widgets, ({ id, width }) => [id, width]),
+    [
+      ["searchbar", "all"],
+      ["clocks", 7],
+      ["calendar", 5],
+      ["todos", 5],
+      ["time_since", 7],
+      ["system_health", "all"],
+      ["status", 5],
+      ["netstats", 7],
+      ["metar", "all"],
+      ["home_assistant", "all"],
+      ["github_ci_stub", "all"]
+    ]
+  );
+  assert.deepEqual({ ...config.options.grid }, {
+    columns: 12,
+    minColWidth: 280,
+    gap: 34,
+    width: "1420px"
+  });
+});
