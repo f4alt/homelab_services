@@ -214,7 +214,7 @@ test("time-since normalizes valid items without changing their order", () => {
   assert.deepEqual(normalizeTimeSinceItems(null), []);
 });
 
-test("time-since details omit absent targets and normal status", () => {
+test("time-since details show only the completion date and omit absent fields", () => {
   const approaching = getTimeSincePresentation(
     trackedItem({
       last_done: "2026-07-31T12:00:00Z",
@@ -234,7 +234,7 @@ test("time-since details omit absent targets and normal status", () => {
   assert.deepEqual(
     approaching.details,
     [
-      { label: "Last done", value: "2026-07-31T12:00:00Z" },
+      { label: "Last done", value: "2026-07-31" },
       { label: "Target", value: "10 days" },
       { label: "Status", value: "Approaching" }
     ]
@@ -249,6 +249,6 @@ test("time-since details omit absent targets and normal status", () => {
   );
   assert.deepEqual(
     normalWithoutTarget.details,
-    [{ label: "Last done", value: "2026-08-07T12:00:00Z" }]
+    [{ label: "Last done", value: "2026-08-07" }]
   );
 });

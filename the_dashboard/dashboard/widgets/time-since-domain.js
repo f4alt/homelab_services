@@ -55,7 +55,8 @@ function classifyAge(elapsedMs, targetDays, approachingRatio) {
 }
 
 function buildDetails(lastDone, targetDays, classification) {
-  const details = [{ label: "Last done", value: lastDone || "unknown" }];
+  const completionDate = lastDone?.split("T", 1)[0] || "unknown";
+  const details = [{ label: "Last done", value: completionDate }];
 
   if (targetDays !== null) {
     details.push({

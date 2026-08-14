@@ -25,6 +25,7 @@ const TIME_SINCE_STYLES = `
       --time-since-flip-perspective: 48rem;
 
       perspective: var(--time-since-flip-perspective);
+      cursor: pointer;
       text-align: center;
     }
 
@@ -245,11 +246,23 @@ function createTileView(state, item, nowMs) {
     resetButton,
     item
   };
-  nameButton.addEventListener("click", () => {
+  const toggleDetails = () => {
     setOpenTileView(state, state.openTileView === tileView ? null : tileView);
+  };
+  tile.addEventListener("click", toggleDetails);
+  nameButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleDetails();
   });
-  backButton.addEventListener("click", () => closeTileDetails(state, true));
-  resetButton.addEventListener("click", () => completeNow(state, tileView.item));
+  backButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeTileDetails(state, true);
+  });
+  resetButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setOpenTileView(state, tileView);
+    return completeNow(state, tileView.item);
+  });
   updateTileView(state, tileView, item, nowMs);
   return tileView;
 }

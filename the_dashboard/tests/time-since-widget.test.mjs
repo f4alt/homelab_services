@@ -224,7 +224,7 @@ test("time-since uses the shared empty state for an empty collection", async () 
   );
 });
 
-test("time-since label flips the tile to conditional details and dismisses them", async () => {
+test("time-since tile flips to date-only conditional details and dismisses them", async () => {
   const approachingTimestamp = new Date(Date.now() - (8 * DAY_MS)).toISOString();
   const items = [
     {
@@ -277,8 +277,9 @@ test("time-since label flips the tile to conditional details and dismisses them"
       assert.equal(findByClass(knownTile, "time-since-tooltip"), null);
       assert.match(
         treeText(knownBack),
-        /Last done\s+.*\s+Target\s+10 days\s+Status\s+Approaching/
+        /Last done\s+\d{4}-\d{2}-\d{2}\s+Target\s+10 days\s+Status\s+Approaching/
       );
+      assert.doesNotMatch(treeText(knownBack), /Last done\s+\d{4}-\d{2}-\d{2}T/);
       assert.equal(treeText(normalBack).includes("Target"), false);
       assert.equal(treeText(normalBack).includes("No target"), false);
       assert.equal(treeText(normalBack).includes("Status"), false);
@@ -301,12 +302,12 @@ test("time-since label flips the tile to conditional details and dismisses them"
       assert.equal(fakeDocument.listenerCount("click"), 0);
       assert.equal(fakeDocument.listenerCount("keydown"), 0);
 
-      knownNameButton.fire("click");
+      knownTile.fire("click");
       fakeDocument.fire("click", { target: new FakeElement("aside") });
       assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
       assert.equal(knownTile.classList.contains("time-since-tile--flipped"), false);
 
-      knownNameButton.fire("click");
+      knownTile.fire("click");
       fakeDocument.fire("keydown", { key: "Escape" });
       assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
       assert.equal(knownNameButton.focusCalls, 2);
@@ -344,6 +345,7 @@ test("resetting the day number posts the existing update contract and reloads", 
     const action = originalButton.fireAsync("click");
     const optimisticButton = findByClass(state.grid.children[0], "time-since-reset-button");
 
+    assert.equal(state.grid.children[0].classList.contains("time-since-tile--flipped"), true);
     assert.equal(originalButton.disabled, true);
     assert.equal(optimisticButton.disabled, true);
     assert.equal(optimisticButton.textContent, "0");
