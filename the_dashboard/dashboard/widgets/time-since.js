@@ -73,14 +73,19 @@ const TIME_SINCE_STYLES = `
     }
 
     .time-since-name-button {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      cursor: pointer;
       max-width: 100%;
       min-width: 0;
+      padding: 0;
       text-align: center;
     }
 
-    .time-since-face--back:focus:not(:focus-visible),
-    .time-since-name-button:focus:not(:focus-visible) {
-      outline: none;
+    .time-since-name-button:is(:hover, :focus-visible) {
+      text-decoration: underline;
+      text-underline-offset: var(--space-xs);
     }
 
     .time-since-details {
@@ -219,14 +224,7 @@ function createTileView(state, item, nowMs) {
   const front = createElement("div", "time-since-face time-since-face--front");
   const nameButton = document.createElement("button");
   nameButton.type = "button";
-  nameButton.className = [
-    "clickable",
-    "clickable--compact",
-    "label",
-    "truncate",
-    "time-since-name",
-    "time-since-name-button"
-  ].join(" ");
+  nameButton.className = "label truncate time-since-name time-since-name-button";
   const resetButton = document.createElement("button");
   resetButton.type = "button";
   const backButton = document.createElement("button");

@@ -272,8 +272,12 @@ test("time-since name flips to date-only conditional details and dismisses them"
       );
       assert.equal(knownNameButton.tagName, "button");
       assert.equal(knownNameButton.textContent, "Known activity");
-      assert.equal(knownNameButton.classList.contains("clickable"), true);
-      assert.equal(knownNameButton.classList.contains("clickable--compact"), true);
+      assert.equal(knownNameButton.classList.contains("clickable"), false);
+      assert.equal(knownNameButton.classList.contains("clickable--compact"), false);
+      assert.match(
+        fakeDocument.head.children[0].textContent,
+        /\.time-since-name-button\s*{[^}]*cursor:\s*pointer;/
+      );
       assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
       assert.equal(knownTile.classList.contains("time-since-tile--flipped"), false);
       assert.equal(findByClass(knownTile, "time-since-tooltip"), null);
