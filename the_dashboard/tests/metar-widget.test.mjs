@@ -68,7 +68,6 @@ test("METAR renders Gateway failure details and recovers the existing station ro
     assert.equal(originalRow.tile.classList.contains("ui-tile"), true);
     const [stationField, ...detailFields] = originalRow.tile.children;
     assert.equal(stationField.classList.contains("label"), true);
-    assert.equal(stationField.classList.contains("metar-station"), true);
     assert.equal(
       originalRow.tile.children.every(
         (field) => field.classList.contains("metar-field")
@@ -84,7 +83,7 @@ test("METAR renders Gateway failure details and recovers the existing station ro
     assert.equal(originalRow.station.textContent, "KDFW");
     assert.equal(originalRow.timestampSpan.textContent, "ERR");
     assert.equal(originalRow.remarksSpan.textContent, "Gateway unavailable: Gateway offline");
-    assert.equal(originalRow.tile.classList.contains("error"), true);
+    assert.equal(originalRow.tile.classList.contains("severity-error"), true);
 
     await registration.implementation.update(instance);
     assert.equal(instance.rows.KDFW, originalRow);
@@ -92,6 +91,6 @@ test("METAR renders Gateway failure details and recovers the existing station ro
     assert.equal(originalRow.timestampSpan.textContent, "191753Z");
     assert.equal(originalRow.windSpan.textContent, "180@12KT");
     assert.equal(originalRow.remarksSpan.textContent, "AO2");
-    assert.equal(originalRow.tile.classList.contains("error"), false);
+    assert.equal(originalRow.tile.classList.contains("severity-error"), false);
   });
 });

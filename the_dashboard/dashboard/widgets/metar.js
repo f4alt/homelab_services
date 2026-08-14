@@ -8,6 +8,23 @@ import {
 import { formatMetarEntry, metarGatewayFailure } from "./metar-domain.js";
 
 const METAR_STYLE_ID = "metar-widget-styles";
+const METAR_FIELD_DEFINITIONS = Object.freeze([
+  {
+    dataKey: "station",
+    elementKey: "station",
+    fallback: "????",
+    labelClass: "label",
+    tagName: "div"
+  },
+  { dataKey: "timestamp", elementKey: "timestampSpan" },
+  { dataKey: "wind", elementKey: "windSpan" },
+  { dataKey: "vis", elementKey: "visSpan" },
+  { dataKey: "wx", elementKey: "wxSpan" },
+  { dataKey: "sky", elementKey: "skySpan", selectorClass: "metar-sky" },
+  { dataKey: "temp", elementKey: "tempSpan" },
+  { dataKey: "alt", elementKey: "altSpan" },
+  { dataKey: "remarks", elementKey: "remarksSpan", selectorClass: "metar-remarks" }
+]);
 const METAR_STYLES = `
     .metar-tile {
       align-items: center;
@@ -54,73 +71,32 @@ const METAR_STYLES = `
 
 function createMetarTile(stationId) {
   const tile = createTile("metar-tile");
+  const elements = { tile };
 
-  const station = document.createElement("div");
-  station.className = "label metar-field metar-station";
-  station.textContent = stationId;
+  for (const definition of METAR_FIELD_DEFINITIONS) {
+    const field = document.createElement(definition.tagName ?? "span");
+    field.className = [
+      definition.labelClass ?? "label-info",
+      "metar-field",
+      definition.selectorClass
+    ]
+      .filter(Boolean)
+      .join(" ");
+    elements[definition.elementKey] = field;
+    tile.appendChild(field);
+  }
 
-  const timestampSpan = document.createElement("span");
-  timestampSpan.className = "label-info metar-field metar-time";
-
-  const windSpan = document.createElement("span");
-  windSpan.className = "label-info metar-field metar-wind";
-
-  const visSpan = document.createElement("span");
-  visSpan.className = "label-info metar-field metar-visibility";
-
-  const wxSpan = document.createElement("span");
-  wxSpan.className = "label-info metar-field metar-weather";
-
-  const skySpan = document.createElement("span");
-  skySpan.className = "label-info metar-field metar-sky";
-
-  const tempSpan = document.createElement("span");
-  tempSpan.className = "label-info metar-field metar-temperature";
-
-  const altSpan = document.createElement("span");
-  altSpan.className = "label-info metar-field metar-altimeter";
-
-  const remarksSpan = document.createElement("span");
-  remarksSpan.className = "label-info metar-field metar-remarks";
-
-  tile.append(
-    station,
-    timestampSpan,
-    windSpan,
-    visSpan,
-    wxSpan,
-    skySpan,
-    tempSpan,
-    altSpan,
-    remarksSpan
-  );
-
-  return {
-    tile,
-    station,
-    timestampSpan,
-    windSpan,
-    visSpan,
-    wxSpan,
-    skySpan,
-    tempSpan,
-    altSpan,
-    remarksSpan
-  };
+  elements.station.textContent = stationId;
+  return elements;
 }
 
 function populateMetarTile(elements, data) {
-  elements.tile.classList.toggle("error", data.state === "error");
+  elements.tile.classList.toggle("severity-error", data.state === "error");
 
-  elements.station.textContent = data.station || "????";
-  elements.timestampSpan.textContent = data.timestamp || "";
-  elements.windSpan.textContent = data.wind || "";
-  elements.visSpan.textContent = data.vis || "";
-  elements.wxSpan.textContent = data.wx || "";
-  elements.skySpan.textContent = data.sky || "";
-  elements.tempSpan.textContent = data.temp || "";
-  elements.altSpan.textContent = data.alt || "";
-  elements.remarksSpan.textContent = data.remarks || "";
+  for (const definition of METAR_FIELD_DEFINITIONS) {
+    elements[definition.elementKey].textContent =
+      data[definition.dataKey] || definition.fallback || "";
+  }
 }
 
 async function fetchMetars(stations) {
