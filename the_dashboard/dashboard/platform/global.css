@@ -219,8 +219,13 @@ body {
   color: var(--muted);
 }
 
-.is-error .widget-message {
-  color: var(--err);
+.severity-warn .widget-status {
+  color: var(--warn-muted) !important;
+}
+
+.is-error *,
+.severity-error .widget-status {
+  color: var(--err-muted) !important;
 }
 
 .ui-tile {
@@ -301,11 +306,16 @@ body {
 }
 
 .severity-warn {
-  border-color: var(--warn-muted) !important;
+  border: 1px solid var(--warn-muted) !important;
+  padding: var(--space-compact);
+  border-radius: var(--radius);
 }
 
+.is-error,
 .severity-error {
-  border-color: var(--err-muted) !important;
+  border: 1px solid var(--err-muted) !important;
+  padding: var(--space-compact);
+  border-radius: var(--radius);
 }
 
 .clickable {

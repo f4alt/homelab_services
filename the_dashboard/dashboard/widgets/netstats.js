@@ -93,6 +93,7 @@ function createStatus() {
 function setAvailability(surface, status, stale, message = "") {
   surface.classList.toggle("severity-warn", stale);
   status.textContent = message;
+  status.style.color = message ? "var(--warn-muted)" : "";
 }
 
 function formatMillis(milliseconds) {

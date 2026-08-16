@@ -182,6 +182,7 @@ const CALENDAR_STYLES = `
       font-size: 11px;
       line-height: 1.2;
       text-align: center;
+      color: var(--warn-muted);
     }
 
     @media (max-width: 420px) {
