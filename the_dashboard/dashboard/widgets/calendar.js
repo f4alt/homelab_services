@@ -416,17 +416,17 @@ window.DASH.registerWidget("calendar", {
       state.events = Array.isArray(data?.events) ? data.events : [];
       state.hasSuccessfulFetch = true;
       state.warning.textContent = "";
-      state.tile.classList.remove("severity-warn", "severity-err");
+      state.lower.classList.remove("severity-warn", "severity-err");
       syncCurrentMonth(state, new Date());
     } catch {
       if (state.aborter !== aborter || aborter.signal.aborted) return;
       if (state.hasSuccessfulFetch) {
         state.warning.textContent = "Calendar refresh failed";
-        state.tile.classList.add("severity-warn");
+        state.lower.classList.add("severity-warn");
         syncCurrentMonth(state, new Date());
       } else {
         setStateMessage(state.lower, "Unable to load calendar.", "error");
-        state.tile.classList.add("severity-err");
+        state.lower.classList.add("severity-err");
       }
     } finally {
       if (state.aborter === aborter) state.aborter = null;
