@@ -63,6 +63,7 @@ Current reusable JavaScript primitives include:
 - `createResponsiveGrid()` and `createStack()` for widget-internal layout
 - `createTile()` for the standard tile surface, with controlled
   `--tile-padding`, `--tile-radius`, and `--tile-box-shadow` overrides
+- `setFlippableTileState()` for the shared flip class and front/back ARIA state
 - `createDismissibleMenu()` for per-instance popup state, ARIA expansion,
   temporary outside-click/Escape listeners, and focus return
 - `bindHoverPopup()` for hover/focus tooltip state and top-layer positioning
@@ -73,7 +74,10 @@ surfaces, menus, inputs, popups, toggles, status dots, progress bars, icons, and
 the standard `label`, `label-info`, and `value-large` typography. Tiled lists
 fit their children by default; use `list-fullWidth` when each child should fill
 the available width and the vertical stack should claim the remaining widget
-space.
+space. A `flippable-tile` wrapper takes its normal size from the front face;
+give both faces their own `clickable` or `ui-tile` surface. The absolutely
+positioned back face can then grow over neighboring tiles without changing the
+list layout.
 
 ## Frontend Contract
 
@@ -223,6 +227,9 @@ Enable the widget in the selected dashboard config. Use
 - Use `createResponsiveGrid()` or `createStack()` for the widget's main content
   and `createTile()` for ordinary tile surfaces. A custom surface should be
   justified by genuinely different semantics or layout.
+- Keep `flippable-tile` wrappers surface-free. Apply the appropriate surface
+  class to each face so the in-flow front reserves the closed size and the
+  content-sized back can overlay it when open.
 - Override a standard tile only through `--tile-padding`, `--tile-radius`, and
   `--tile-box-shadow`. Keep data layout, field grouping, and domain-state
   effects in the widget.

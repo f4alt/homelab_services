@@ -3,7 +3,6 @@ import {
   createDismissibleMenu,
   createElement,
   createResponsiveGrid,
-  createTile,
   fetchJson,
   installWidgetStyles,
   setFlippableTileState,
@@ -35,13 +34,9 @@ const TIME_SINCE_STYLES = `
     .time-since-face--back {
       align-content: center;
       appearance: none;
-      background: transparent;
-      border: 0;
       color: inherit;
       display: grid;
-      padding: 0;
       text-align: left;
-      width: 100%;
     }
 
     .time-since-name {
@@ -189,11 +184,11 @@ function renderDetails(container, details) {
 }
 
 function createTileView(state, item, nowMs) {
-  const tile = createTile("flippable-tile time-since-tile");
+  const tile = createElement("div", "flippable-tile time-since-tile");
   const flipper = createElement("div", "flippable-tile-inner");
   const front = createElement(
     "div",
-    "flippable-tile-face flippable-tile-face--front time-since-face time-since-face--front"
+    "ui-tile flippable-tile-face flippable-tile-face--front time-since-face time-since-face--front"
   );
   const nameButton = document.createElement("button");
   nameButton.type = "button";
@@ -203,6 +198,7 @@ function createTileView(state, item, nowMs) {
   const backButton = document.createElement("button");
   backButton.type = "button";
   backButton.className = [
+    "ui-tile",
     "flippable-tile-face",
     "flippable-tile-face--back",
     "time-since-face",

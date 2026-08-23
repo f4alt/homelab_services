@@ -104,6 +104,52 @@ test("home-assistant renders only valid named actions in declared order", async 
   });
 });
 
+test("Home Assistant action tiles wrap their front content by default", async () => {
+  await withHomeAssistantWidget(
+    async () => createSuccessResponse({}),
+    async ({ fakeDocument, registration }) => {
+      const root = new FakeElement("section");
+      registration.implementation.mount(root, {
+        props: {
+          buttons: [{
+            name: "Office Focus",
+            api: "/api/services/script/dashboard_office_focus"
+          }]
+        }
+      });
+
+      assert.doesNotMatch(
+        fakeDocument.head.children[0].textContent,
+        /\.home-assistant-tile\s*{[^}]*width:\s*100%;/
+      );
+    }
+  );
+});
+
+test("Home Assistant flip faces own their surfaces while the button anchors layout", async () => {
+  await withHomeAssistantWidget(
+    async () => createSuccessResponse({}),
+    async ({ registration }) => {
+      const root = new FakeElement("section");
+      registration.implementation.mount(root, {
+        props: {
+          buttons: [{
+            name: "Office Focus",
+            api: "/api/services/script/dashboard_office_focus"
+          }]
+        }
+      });
+      const tile = findByClass(root, "home-assistant-tile");
+      const front = findByClass(tile, "home-assistant-face--front");
+      const back = findByClass(tile, "home-assistant-face--back");
+
+      assert.equal(tile.classList.contains("clickable"), false);
+      assert.equal(front.classList.contains("clickable"), true);
+      assert.equal(back.classList.contains("clickable"), true);
+    }
+  );
+});
+
 test("a Home Assistant action posts only its path and prevents duplicate pending clicks", async () => {
   const upstream = createDeferred();
   const requests = [];

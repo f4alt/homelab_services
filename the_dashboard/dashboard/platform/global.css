@@ -245,38 +245,57 @@ body {
 
 .flippable-tile {
   --flippable-tile-duration: 300ms;
+  --flippable-tile-open-z-index: 1;
   --flippable-tile-perspective: 48rem;
 
   perspective: var(--flippable-tile-perspective);
+  position: relative;
 }
 
 .flippable-tile-inner {
   display: grid;
   transform-style: preserve-3d;
-  transition: transform var(--flippable-tile-duration) ease;
   width: 100%;
-}
-
-.flippable-tile--flipped .flippable-tile-inner {
-  transform: rotateY(180deg);
 }
 
 .flippable-tile-face {
   backface-visibility: hidden;
   grid-area: 1 / 1;
   min-width: 0;
+  transition: transform var(--flippable-tile-duration) ease;
 }
 
 .flippable-tile-face--front {
+  position: relative;
   transform: rotateY(0deg);
 }
 
 .flippable-tile-face--back {
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  min-width: 100%;
+  pointer-events: none;
+  position: absolute;
   transform: rotateY(180deg);
+  width: max-content;
+}
+
+.flippable-tile--flipped {
+  z-index: var(--flippable-tile-open-z-index);
+}
+
+.flippable-tile--flipped .flippable-tile-face--front {
+  pointer-events: none;
+  transform: rotateY(-180deg);
+}
+
+.flippable-tile--flipped .flippable-tile-face--back {
+  pointer-events: auto;
+  transform: rotateY(0deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .flippable-tile-inner {
+  .flippable-tile-face {
     transition: none;
   }
 }

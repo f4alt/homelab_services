@@ -12,12 +12,23 @@ import {
 const HOME_ASSISTANT_STYLE_ID = "home-assistant-widget-styles";
 const HOME_ASSISTANT_STYLES = `
     .home-assistant-tile {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      padding: 0;
       text-align: center;
-      width: 100%;
     }
 
     .home-assistant-tile.severity-error {
-      padding: var(--clickable-padding, var(--widget-padding));
+      border: 0 !important;
+      padding: 0;
+    }
+
+    .home-assistant-tile.severity-error .home-assistant-face--back {
+      border-color: var(--err-muted) !important;
     }
 
     .home-assistant-face {
@@ -27,8 +38,17 @@ const HOME_ASSISTANT_STYLES = `
       overflow-wrap: anywhere;
     }
 
+    .home-assistant-tile:focus-visible .home-assistant-face--front {
+      border-color: var(--clickable-hover-border);
+      box-shadow: var(--clickable-shadow, var(--shadow-surface-hover));
+    }
+
     .home-assistant-tile:disabled {
       color: var(--muted);
+      cursor: wait;
+    }
+
+    .home-assistant-tile:disabled .home-assistant-face--front {
       cursor: wait;
     }
   `;
@@ -80,18 +100,18 @@ function showActionResult(state, tileView, message, isError) {
 function createActionTile(state, action) {
   const tile = createElement(
     "button",
-    "clickable flippable-tile home-assistant-tile"
+    "flippable-tile home-assistant-tile"
   );
   tile.type = "button";
   const flipper = createElement("span", "flippable-tile-inner");
   const front = createElement(
     "span",
-    "flippable-tile-face flippable-tile-face--front home-assistant-face home-assistant-face--front",
+    "clickable flippable-tile-face flippable-tile-face--front home-assistant-face home-assistant-face--front",
     action.name
   );
   const back = createElement(
     "span",
-    "flippable-tile-face flippable-tile-face--back home-assistant-face home-assistant-face--back widget-status"
+    "clickable flippable-tile-face flippable-tile-face--back home-assistant-face home-assistant-face--back widget-status"
   );
   back.setAttribute("aria-live", "polite");
   flipper.append(front, back);

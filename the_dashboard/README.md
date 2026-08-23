@@ -162,7 +162,8 @@ relative `/api/services/script/dashboard_*` action paths; expose only dedicated,
 low-consequence Home Assistant scripts that use the reserved `dashboard_`
 script ID prefix. Each action tile flips to show its result, dismisses that
 result when the tile or elsewhere is clicked, and uses an error border for
-failed actions until the result is dismissed.
+failed actions until the result is dismissed. Closed actions wrap their button
+text; an open result grows over neighboring tiles without moving them.
 
 The `system-health` widget reads CPU, memory, disk, temperature, and uptime from
 the Linux data already visible to the Gateway container. Its compact strip uses
@@ -172,7 +173,9 @@ border only when host telemetry needs attention.
 The dedicated `time-since` widget shows tracked Todo activities in backend
 order, provides local source-file filtering, colors only the elapsed-day value
 as a target approaches or passes, and records a completion through the existing
-Todo update route when that clickable value is selected.
+Todo update route when that clickable value is selected. Its closed tiles wrap
+their front content, while open details expand as overlays without reflowing the
+tile list.
 
 ## Adding a Widget
 

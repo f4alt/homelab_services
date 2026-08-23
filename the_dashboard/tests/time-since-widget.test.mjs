@@ -90,7 +90,12 @@ test("time-since renders ordered tiles inside a height-capped responsive grid", 
       state.grid.children.map((tile) => findByClass(tile, "time-since-name").textContent),
       ["Change the AC filter", "Test the backup restore"]
     );
-    assert.equal(state.grid.children.every((tile) => tile.classList.contains("ui-tile")), true);
+    assert.equal(
+      state.grid.children.every((tile) => (
+        findByClass(tile, "time-since-face--front").classList.contains("ui-tile")
+      )),
+      true
+    );
     assert.equal(
       state.menu.children.every((item) => (
         item.className === "popup-menu-item clickable label"
@@ -254,6 +259,7 @@ test("time-since name flips to date-only conditional details and dismisses them"
       const knownTile = state.grid.children[0];
       const knownButton = findByClass(knownTile, "time-since-reset-button");
       const knownNameButton = findByClass(knownTile, "time-since-name-button");
+      const knownFront = findByClass(knownTile, "time-since-face--front");
       const knownBack = findByClass(knownTile, "time-since-face--back");
       const normalTile = state.grid.children[1];
       const normalButton = findByClass(
@@ -274,6 +280,9 @@ test("time-since name flips to date-only conditional details and dismisses them"
       assert.equal(knownNameButton.textContent, "Known activity");
       assert.equal(knownNameButton.classList.contains("clickable"), false);
       assert.equal(knownNameButton.classList.contains("clickable--compact"), false);
+      assert.equal(knownTile.classList.contains("ui-tile"), false);
+      assert.equal(knownFront.classList.contains("ui-tile"), true);
+      assert.equal(knownBack.classList.contains("ui-tile"), true);
       assert.match(
         fakeDocument.head.children[0].textContent,
         /\.time-since-name-button\s*{[^}]*cursor:\s*pointer;/
