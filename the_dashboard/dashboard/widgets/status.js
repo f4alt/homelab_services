@@ -21,6 +21,16 @@ const INDICATOR_CLASSES = Object.freeze({
   other: "dot--warn"
 });
 const STATUS_STYLES = `
+    .status-tile-shell {
+      --clickable-background: var(--tile);
+      --clickable-border: var(--tile-border);
+      --clickable-padding: var(--tile-padding, var(--widget-padding));
+      --clickable-radius: var(--tile-radius, var(--radius));
+      color: inherit;
+      display: block;
+      text-decoration: none;
+    }
+
     .status-tile {
       align-items: center;
       display: grid;
@@ -96,6 +106,7 @@ function createStyledIcon(icon, checkName) {
 
 function createStatusTile(check) {
   const link = document.createElement("a");
+  link.className = "ui-tile status-tile-shell";
   const tile = createElement("div", "status-tile");
   const dotWrap = createElement("div", "popup-on-hover status-popup-target");
   const dot = createElement("div", "dot");

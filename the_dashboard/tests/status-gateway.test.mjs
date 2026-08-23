@@ -9,7 +9,9 @@ import {
 } from "./helpers/test-utils.mjs";
 
 const LOCAL_TARGETS = Object.freeze([
-  "http://localhost:8123/health",
+  "http://localhost/admin/",
+  "http://localhost:18086",
+  "http://localhost:8123",
   "http://127.0.0.1:8123/health",
   "http://[::1]:8123/health"
 ]);
@@ -40,9 +42,30 @@ test("HTTP status checks probe local browser URLs through the Docker host", asyn
     assert.deepEqual(result, {
       indicator: "passing",
       detail: "HTTP 204 • 15ms",
-      href: target
+      href: new URL(target).toString()
     });
   }
+});
+
+test("HTTP status checks normalize the current Router bare-host configuration", async () => {
+  const requests = [];
+  const provider = createHttpStatusProvider({
+    allowedHosts: ["192.168.1.*"],
+    fetchImpl: async (url) => {
+      requests.push(url.toString());
+      return { status: 200 };
+    },
+    monotonicNow: () => 10
+  });
+
+  const result = await provider.check({ url: "192.168.1.1" });
+
+  assert.deepEqual(requests, ["http://192.168.1.1/"]);
+  assert.deepEqual(result, {
+    indicator: "passing",
+    detail: "HTTP 200 • 0ms",
+    href: "http://192.168.1.1/"
+  });
 });
 
 test("HTTP status checks keep external targets behind the configured allowlist", async () => {
@@ -90,19 +113,28 @@ test("HTTP status checks probe allowlisted external URLs without rewriting them"
   });
 });
 
-test("HTTP status checks map error responses to attention", async () => {
+test("HTTP status checks map the response status boundaries", async () => {
   const target = "https://service.example.test/health";
-  const provider = createHttpStatusProvider({
-    allowedHosts: ["service.example.test"],
-    fetchImpl: async () => ({ status: 503 }),
-    monotonicNow: () => 10
-  });
+  const scenarios = [
+    { status: 200, indicator: "passing" },
+    { status: 399, indicator: "passing" },
+    { status: 400, indicator: "attention" },
+    { status: 503, indicator: "attention" }
+  ];
 
-  assert.deepEqual(await provider.check({ url: target }), {
-    indicator: "attention",
-    detail: "HTTP 503 • 0ms",
-    href: target
-  });
+  for (const { status, indicator } of scenarios) {
+    const provider = createHttpStatusProvider({
+      allowedHosts: ["service.example.test"],
+      fetchImpl: async () => ({ status }),
+      monotonicNow: () => 10
+    });
+
+    assert.deepEqual(await provider.check({ url: target }), {
+      indicator,
+      detail: `HTTP ${status} • 0ms`,
+      href: target
+    });
+  }
 });
 
 test("HTTP status checks map transport failures to attention", async () => {

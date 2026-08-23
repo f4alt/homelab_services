@@ -114,6 +114,25 @@ test("GitHub Actions checks treat no matching run as a legitimate other state", 
   });
 });
 
+test("GitHub Actions checks preserve a valid status when a run has no destination", async () => {
+  const provider = createGitHubActionsStatusProvider({
+    apiBaseUrl: API_BASE_URL,
+    fetchImpl: async () => jsonResponse({
+      workflow_runs: [{ status: "completed", conclusion: "success" }]
+    })
+  });
+
+  assert.deepEqual(await provider.check({
+    repository: REPOSITORY,
+    workflow: "push.yml",
+    branch: "main"
+  }), {
+    indicator: "passing",
+    detail: "Workflow passed.",
+    href: null
+  });
+});
+
 test("GitHub Actions checks apply optional event filters and authorization", async () => {
   const requests = [];
   const token = "test-token";

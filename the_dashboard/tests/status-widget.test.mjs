@@ -172,6 +172,159 @@ test("status renders ordered duplicate checks and applies normalized results by 
   );
 });
 
+test("status renders the representative provider matrix with consistent tile surfaces", async () => {
+  const scenarios = [
+    {
+      check: {
+        name: "Router",
+        icon: "🛜",
+        provider: { type: "http", url: "192.168.1.1" }
+      },
+      result: {
+        indicator: "passing",
+        detail: "HTTP 200 • 12ms",
+        href: "http://192.168.1.1/"
+      },
+      iconText: "🛜"
+    },
+    {
+      check: {
+        name: "Pi-hole",
+        icon: "🛡️",
+        provider: { type: "http", url: "http://localhost/admin/" }
+      },
+      result: {
+        indicator: "passing",
+        detail: "HTTP 200 • 8ms",
+        href: "http://localhost/admin/"
+      },
+      iconText: "🛡️"
+    },
+    {
+      check: {
+        name: "Syncthing",
+        icon: "🗘",
+        provider: { type: "http", url: "http://localhost:18086" }
+      },
+      result: {
+        indicator: "passing",
+        detail: "HTTP 200 • 5ms",
+        href: "http://localhost:18086/"
+      },
+      iconText: "🗘"
+    },
+    {
+      check: {
+        name: "Home Assistant",
+        icon: "🏠",
+        provider: { type: "http", url: "http://localhost:8123" }
+      },
+      result: {
+        indicator: "passing",
+        detail: "HTTP 200 • 7ms",
+        href: "http://localhost:8123/"
+      },
+      iconText: "🏠"
+    },
+    {
+      check: {
+        name: "BRL-CAD CI",
+        icon: "/icons/github.svg",
+        provider: {
+          type: "github-actions",
+          repository: "BRL-CAD/brlcad",
+          workflow: "push.yml"
+        }
+      },
+      result: {
+        indicator: "other",
+        detail: "Workflow in progress.",
+        href: "https://github.com/BRL-CAD/brlcad/actions/runs/42"
+      },
+      imageIcon: "/icons/github.svg"
+    },
+    {
+      check: {
+        name: "Expected broken",
+        provider: { type: "http", url: "https://offline.example.test" }
+      },
+      result: {
+        indicator: "attention",
+        detail: "No response from target.",
+        href: "https://offline.example.test/"
+      },
+      iconText: "-"
+    },
+    {
+      check: {
+        name: "No destination",
+        provider: { type: "unknown" }
+      },
+      result: {
+        indicator: "attention",
+        detail: "Unknown status provider \"unknown\".",
+        href: null
+      },
+      iconText: "-"
+    }
+  ];
+  const checks = scenarios.map(({ check }) => check);
+  let submittedBody;
+
+  await withStatusWidget(
+    async (_url, options) => {
+      submittedBody = JSON.parse(options.body);
+      return createSuccessResponse({
+        results: scenarios.map(({ result }) => result)
+      });
+    },
+    async ({ registration }) => {
+      const root = new FakeElement("section");
+      const state = registration.implementation.mount(root, { props: { checks } });
+
+      for (const tile of state.tiles) {
+        assert.equal(tile.link.classList.contains("ui-tile"), true);
+        assert.equal(tile.link.classList.contains("clickable"), false);
+      }
+
+      await registration.implementation.update(state);
+
+      assert.deepEqual(submittedBody, {
+        providers: checks.map(({ provider }) => provider)
+      });
+      for (const [index, scenario] of scenarios.entries()) {
+        const tile = state.tiles[index];
+        const icons = findAll(
+          tile.link,
+          (element) => element.classList.contains("icon")
+        );
+        const expectedHref = scenario.result.href;
+
+        assert.equal(icons.length, 1, scenario.check.name);
+        const [icon] = icons;
+        assert.equal(tile.link.classList.contains("ui-tile"), true, scenario.check.name);
+        assert.equal(
+          tile.link.classList.contains("clickable"),
+          Boolean(expectedHref),
+          scenario.check.name
+        );
+        assert.equal(tile.link.getAttribute("href"), expectedHref, scenario.check.name);
+        assert.equal(
+          tile.dot.getAttribute("aria-label"),
+          `${scenario.check.name}: ${scenario.result.indicator}. ${scenario.result.detail}`
+        );
+
+        if (scenario.imageIcon) {
+          assert.equal(icon.children[0].src, scenario.imageIcon);
+          assert.equal(icon.children[0].alt, `${scenario.check.name} icon`);
+        } else {
+          assert.equal(icon.textContent, scenario.iconText);
+        }
+      }
+    }
+  );
+});
+
 test("status preserves the last successful results when a whole refresh fails", async () => {
   const responses = [
     () => statusResponse(),
@@ -208,6 +361,11 @@ test("status preserves the last successful results when a whole refresh fails", 
 
       assert.equal(tile.dot.classList.contains("dot--warn"), true);
       assert.equal(tile.popup.textContent, "Workflow running.");
+      assert.equal(tile.link.classList.contains("ui-tile"), true);
+      assert.equal(tile.link.classList.contains("clickable"), false);
+      assert.equal(tile.link.getAttribute("href"), null);
+      assert.equal(tile.link.getAttribute("target"), null);
+      assert.equal(tile.link.getAttribute("rel"), null);
       assert.equal(state.warning.textContent, "");
     }
   );

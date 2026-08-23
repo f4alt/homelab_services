@@ -391,8 +391,8 @@ body {
   display: block;
   text-decoration: none;
   color: inherit;
-  background: var(--bg);
-  border: 1px solid var(--bg);
+  background: var(--clickable-background, var(--bg));
+  border: 1px solid var(--clickable-border, var(--bg));
   border-radius: var(--clickable-radius, var(--radius));
   padding: var(--clickable-padding, var(--widget-padding));
   transition: box-shadow .15s ease, border-color .15s ease;
