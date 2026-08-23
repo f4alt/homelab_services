@@ -1,3 +1,6 @@
+const CONTENT_REFRESH_MS = 5 * 60 * 1000;
+const SERVICE_STATUS_REFRESH_MS = 2 * 60 * 1000;
+
 window.DASH_CONFIG = {
   apiBase: "/api",
 
@@ -49,7 +52,7 @@ window.DASH_CONFIG = {
       type: "calendar",
       id: "calendar",
       width: 5,
-      refreshMs: 300000,
+      refreshMs: CONTENT_REFRESH_MS,
       props: {
         feedUrl: ""
       }
@@ -58,13 +61,13 @@ window.DASH_CONFIG = {
       type: "todos",
       id: "todos",
       width: 5,
-      refreshMs: 60000
+      refreshMs: CONTENT_REFRESH_MS
     },
     {
       type: "time-since",
       id: "time_since",
       width: 7,
-      refreshMs: 60000,
+      refreshMs: CONTENT_REFRESH_MS,
       props: {
         approachingRatio: 0.8
       }
@@ -79,7 +82,7 @@ window.DASH_CONFIG = {
       type: "status",
       id: "status",
       width: 5,
-      refreshMs: 30000,
+      refreshMs: SERVICE_STATUS_REFRESH_MS,
       props: {
         services: []
       }
@@ -99,7 +102,7 @@ window.DASH_CONFIG = {
       type: "metar",
       id: "metar",
       width: "all",
-      refreshMs: 300000,
+      refreshMs: CONTENT_REFRESH_MS,
       props: {
         stations: ["KDFW", "KIAH", "KLAX"]
       }

@@ -58,3 +58,18 @@ test("tracked dashboard config preserves the wide layout rhythm", async () => {
     width: "1420px"
   });
 });
+
+test("tracked dashboard config uses conservative refresh cadences", async () => {
+  const config = await loadTrackedConfig();
+  const refreshById = Object.fromEntries(
+    Array.from(config.widgets, ({ id, refreshMs }) => [id, refreshMs])
+  );
+
+  const contentRefreshMs = 5 * 60 * 1000;
+  const serviceStatusRefreshMs = 2 * 60 * 1000;
+  assert.equal(refreshById.calendar, contentRefreshMs);
+  assert.equal(refreshById.todos, contentRefreshMs);
+  assert.equal(refreshById.time_since, contentRefreshMs);
+  assert.equal(refreshById.metar, contentRefreshMs);
+  assert.equal(refreshById.status, serviceStatusRefreshMs);
+});
