@@ -6,7 +6,7 @@ x-service-logging: &service-logging
 
 services:
   radicale:
-    image: tomsquest/docker-radicale:latest@sha256:81ae9a4bce0ebadbf9dc2864b30e3f281bb26fba9e528f22d8cae6699dabfe32
+    image: tomsquest/docker-radicale:latest@sha256:308f57b77f5016395ec8eae13db438b810c540218d61d56b48eff5cdaabdcb07
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-k", "-f", "https://127.0.0.1:5232/"]
