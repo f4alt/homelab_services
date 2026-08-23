@@ -1,3 +1,9 @@
+x-service-logging: &service-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   radicale:
     image: tomsquest/docker-radicale:latest@sha256:81ae9a4bce0ebadbf9dc2864b30e3f281bb26fba9e528f22d8cae6699dabfe32
@@ -14,6 +20,7 @@ services:
       - ${RADICALE_USERS_HOST_PATH:-./radicale/users}:/config/users:ro
       - ${RADICALE_CERT_HOST_PATH:-./radicale/generated-certs}:/config/certs:ro
       - radicale_data:/data
+    logging: *service-logging
 
   todo_api:
     build: .
@@ -37,6 +44,7 @@ services:
       - ${API_HOST_PORT:-5000}:5000
     volumes:
       - ${TODO_FILES_HOST_PATH:-../todo_files}:/data/todo_files
+    logging: *service-logging
     command: ["todo-sync", "serve"]
 
   todo_sync_worker:
@@ -57,6 +65,7 @@ services:
       CALDAV_COLLECTION_PREFIX: ${CALDAV_COLLECTION_PREFIX:-}
     volumes:
       - ${TODO_FILES_HOST_PATH:-../todo_files}:/data/todo_files
+    logging: *service-logging
     command: ["todo-sync", "sync", "--watch", "--interval", "${SYNC_INTERVAL_SECONDS:-300}"]
 
 volumes:

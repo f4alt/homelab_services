@@ -1,3 +1,9 @@
+x-service-logging: &service-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   syncthing:
     image: syncthing/syncthing:latest@sha256:8c8ff37ab6aa8be23b700648a90fa9412e214852e9fd6ea8477c8334792daec0
@@ -10,3 +16,4 @@ services:
     volumes:
       - "${SYNCTHING_CONFIG_HOST_PATH:-./config}:/var/syncthing/config"
       - "${SYNCTHING_SOURCE_HOST_PATH:-./source}:/var/syncthing/Sync"
+    logging: *service-logging

@@ -1,3 +1,9 @@
+x-service-logging: &service-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   pihole:
     image: pihole/pihole:latest@sha256:f7d1be836e3bc608b56d82fc9904f5a831cdfbc0dc9c6d58f94e4c985c70038b
@@ -13,3 +19,4 @@ services:
       FTLCONF_dns_listeningMode: "${PIHOLE_DNS_LISTENING_MODE:-ALL}"
     volumes:
       - "${PIHOLE_CONFIG_HOST_PATH:-./config}:/etc/pihole"
+    logging: *service-logging
