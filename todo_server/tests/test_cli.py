@@ -5,16 +5,58 @@ from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from todo_sync.cli import DEFAULT_SYNC_INTERVAL_SECONDS, build_parser, run_server, run_sync
+from todo_sync.cli import (
+    DEFAULT_SYNC_INTERVAL_SECONDS,
+    SYNC_INTERVAL_ENV_VAR,
+    build_parser,
+    run_server,
+    run_sync,
+)
 from todo_sync.sync import SyncResult
 
 
 class CliTest(unittest.TestCase):
     def test_watch_sync_defaults_to_fifteen_minutes(self):
-        args = build_parser().parse_args(["sync", "--watch"])
+        with patch.dict("os.environ", {}, clear=True):
+            args = build_parser().parse_args(["sync", "--watch"])
 
         self.assertEqual(DEFAULT_SYNC_INTERVAL_SECONDS, 15 * 60)
         self.assertEqual(args.interval, DEFAULT_SYNC_INTERVAL_SECONDS)
+
+    def test_watch_sync_uses_environment_interval(self):
+        configured_interval_seconds = 30 * 60
+        with patch.dict(
+            "os.environ",
+            {SYNC_INTERVAL_ENV_VAR: str(configured_interval_seconds)},
+            clear=True,
+        ):
+            args = build_parser().parse_args(["sync", "--watch"])
+
+        self.assertEqual(args.interval, configured_interval_seconds)
+
+    def test_explicit_interval_overrides_environment_interval(self):
+        configured_interval_seconds = 30 * 60
+        explicit_interval_seconds = 20 * 60
+        with patch.dict(
+            "os.environ",
+            {SYNC_INTERVAL_ENV_VAR: str(configured_interval_seconds)},
+            clear=True,
+        ):
+            args = build_parser().parse_args(
+                ["sync", "--watch", "--interval", str(explicit_interval_seconds)]
+            )
+
+        self.assertEqual(args.interval, explicit_interval_seconds)
+
+    def test_watch_sync_rejects_non_positive_environment_intervals(self):
+        for interval in ("0", "-1"):
+            with self.subTest(interval=interval):
+                with (
+                    patch.dict("os.environ", {SYNC_INTERVAL_ENV_VAR: interval}, clear=True),
+                    patch("sys.stderr", new=StringIO()),
+                    self.assertRaises(SystemExit),
+                ):
+                    build_parser().parse_args(["sync", "--watch"])
 
     def test_watch_sync_rejects_non_positive_intervals(self):
         for interval in ("0", "-1"):
@@ -41,7 +83,11 @@ class CliTest(unittest.TestCase):
 
     def test_watch_sync_does_not_log_successful_cycles(self):
         result = SyncResult(task_count=2, synced_at=datetime(2026, 8, 23, tzinfo=timezone.utc))
-        args = SimpleNamespace(env_file=None, watch=True, interval=300)
+        args = SimpleNamespace(
+            env_file=None,
+            watch=True,
+            interval=DEFAULT_SYNC_INTERVAL_SECONDS,
+        )
 
         with (
             patch("todo_sync.cli.Settings.from_env"),
@@ -56,7 +102,11 @@ class CliTest(unittest.TestCase):
         print_mock.assert_not_called()
 
     def test_watch_sync_preserves_failure_diagnostics(self):
-        args = SimpleNamespace(env_file=None, watch=True, interval=300)
+        args = SimpleNamespace(
+            env_file=None,
+            watch=True,
+            interval=DEFAULT_SYNC_INTERVAL_SECONDS,
+        )
 
         with (
             patch("todo_sync.cli.Settings.from_env"),

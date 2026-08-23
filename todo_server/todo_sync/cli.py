@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import time
 import traceback
 
@@ -8,6 +9,7 @@ from .sync import SyncService
 
 
 DEFAULT_SYNC_INTERVAL_SECONDS = 15 * 60
+SYNC_INTERVAL_ENV_VAR = "SYNC_INTERVAL_SECONDS"
 
 
 def _positive_seconds(value):
@@ -56,7 +58,7 @@ def build_parser():
     sync_parser.add_argument(
         "--interval",
         type=_positive_seconds,
-        default=DEFAULT_SYNC_INTERVAL_SECONDS,
+        default=os.getenv(SYNC_INTERVAL_ENV_VAR, str(DEFAULT_SYNC_INTERVAL_SECONDS)),
         help="Seconds between syncs in watch mode.",
     )
     sync_parser.set_defaults(func=run_sync)

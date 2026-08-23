@@ -216,5 +216,6 @@ todo-sync --env-file .env serve
 todo-sync --env-file .env sync --watch
 ```
 
-Watch mode reconciles every 15 minutes by default. Use `--interval` to choose a
-different positive number of seconds for an interactive or custom deployment.
+Watch mode reconciles every 15 minutes by default. Set `SYNC_INTERVAL_SECONDS`
+for the Docker Compose worker, or use `--interval` to choose a different positive
+number of seconds for an interactive or custom deployment.

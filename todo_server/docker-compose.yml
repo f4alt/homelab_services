@@ -63,6 +63,8 @@ services:
       CALDAV_USERNAME: ${CALDAV_USERNAME:-todo}
       CALDAV_PASSWORD: ${CALDAV_PASSWORD:-todo}
       CALDAV_COLLECTION_PREFIX: ${CALDAV_COLLECTION_PREFIX:-}
+      # Keep the application default authoritative while passing through deployment overrides.
+      SYNC_INTERVAL_SECONDS:
     volumes:
       - ${TODO_FILES_HOST_PATH:-../todo_files}:/data/todo_files
     logging: *service-logging
