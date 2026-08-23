@@ -66,7 +66,7 @@ services:
     volumes:
       - ${TODO_FILES_HOST_PATH:-../todo_files}:/data/todo_files
     logging: *service-logging
-    command: ["todo-sync", "sync", "--watch", "--interval", "${SYNC_INTERVAL_SECONDS:-300}"]
+    command: ["todo-sync", "sync", "--watch"]
 
 volumes:
   radicale_data:

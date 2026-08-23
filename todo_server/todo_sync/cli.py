@@ -7,6 +7,16 @@ from .config import Settings
 from .sync import SyncService
 
 
+DEFAULT_SYNC_INTERVAL_SECONDS = 15 * 60
+
+
+def _positive_seconds(value):
+    seconds = int(value)
+    if seconds <= 0:
+        raise argparse.ArgumentTypeError("interval must be greater than zero")
+    return seconds
+
+
 def run_sync(args):
     settings = Settings.from_env(args.env_file)
     service = SyncService(settings)
@@ -43,7 +53,12 @@ def build_parser():
 
     sync_parser = subparsers.add_parser("sync", help="Run one sync cycle.")
     sync_parser.add_argument("--watch", action="store_true", help="Run sync repeatedly.")
-    sync_parser.add_argument("--interval", type=int, default=300, help="Seconds between syncs in watch mode.")
+    sync_parser.add_argument(
+        "--interval",
+        type=_positive_seconds,
+        default=DEFAULT_SYNC_INTERVAL_SECONDS,
+        help="Seconds between syncs in watch mode.",
+    )
     sync_parser.set_defaults(func=run_sync)
 
     server_parser = subparsers.add_parser("serve", help="Run the HTTP API.")

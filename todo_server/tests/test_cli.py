@@ -1,14 +1,27 @@
 import logging
 import unittest
 from datetime import datetime, timezone
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from todo_sync.cli import run_server, run_sync
+from todo_sync.cli import DEFAULT_SYNC_INTERVAL_SECONDS, build_parser, run_server, run_sync
 from todo_sync.sync import SyncResult
 
 
 class CliTest(unittest.TestCase):
+    def test_watch_sync_defaults_to_fifteen_minutes(self):
+        args = build_parser().parse_args(["sync", "--watch"])
+
+        self.assertEqual(DEFAULT_SYNC_INTERVAL_SECONDS, 15 * 60)
+        self.assertEqual(args.interval, DEFAULT_SYNC_INTERVAL_SECONDS)
+
+    def test_watch_sync_rejects_non_positive_intervals(self):
+        for interval in ("0", "-1"):
+            with self.subTest(interval=interval):
+                with patch("sys.stderr", new=StringIO()), self.assertRaises(SystemExit):
+                    build_parser().parse_args(["sync", "--watch", "--interval", interval])
+
     def test_one_shot_sync_reports_success(self):
         result = SyncResult(task_count=2, synced_at=datetime(2026, 8, 23, tzinfo=timezone.utc))
         args = SimpleNamespace(env_file=None, watch=False)

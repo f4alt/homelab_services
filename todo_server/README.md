@@ -213,5 +213,8 @@ Run without Docker if Radicale is already available:
 ```sh
 todo-sync --env-file .env sync
 todo-sync --env-file .env serve
-todo-sync --env-file .env sync --watch --interval 300
+todo-sync --env-file .env sync --watch
 ```
+
+Watch mode reconciles every 15 minutes by default. Use `--interval` to choose a
+different positive number of seconds for an interactive or custom deployment.
