@@ -104,6 +104,8 @@ test("status rejects checks without the required common fields", async () => {
             { name: " ", provider: validProvider },
             { name: "Missing provider" },
             { name: "Wrong icon", icon: 42, provider: validProvider },
+            { name: "Unsafe href", href: "javascript:alert(1)", provider: validProvider },
+            { name: "Empty href", href: " ", provider: validProvider },
             { name: "Valid check", provider: validProvider }
           ]
         }
@@ -118,6 +120,69 @@ test("status rejects checks without the required common fields", async () => {
         state.warning.textContent,
         "Some status checks have invalid configuration."
       );
+    }
+  );
+});
+
+test("status applies a configured destination before the first provider result", async () => {
+  const routerUrl = "http://192.168.1.1/";
+
+  await withStatusWidget(
+    async () => createSuccessResponse({
+      results: [{
+        indicator: "attention",
+        detail: "HTTP 401 • 12ms",
+        href: "http://provider.example.test/"
+      }]
+    }),
+    async ({ registration }) => {
+      const root = new FakeElement("section");
+      const state = registration.implementation.mount(root, {
+        props: {
+          checks: [{
+            name: "Router",
+            icon: "🛜",
+            href: routerUrl,
+            provider: { type: "http", url: "192.168.1.1" }
+          }]
+        }
+      });
+      const [tile] = state.tiles;
+
+      assert.equal(tile.link.getAttribute("href"), routerUrl);
+      assert.equal(tile.link.getAttribute("target"), "_blank");
+      assert.equal(tile.link.getAttribute("rel"), "noopener noreferrer");
+      assert.equal(tile.link.classList.contains("clickable"), true);
+
+      await registration.implementation.update(state);
+
+      assert.equal(tile.link.getAttribute("href"), routerUrl);
+      assert.equal(tile.popup.textContent, "HTTP 401 • 12ms");
+    }
+  );
+});
+
+test("status preserves an explicitly disabled destination after provider results", async () => {
+  await withStatusWidget(
+    async () => statusResponse(),
+    async ({ registration }) => {
+      const root = new FakeElement("section");
+      const state = registration.implementation.mount(root, {
+        props: {
+          checks: [{
+            name: "Display only",
+            href: null,
+            provider: { type: "http", url: SERVICE_URL }
+          }]
+        }
+      });
+      const [tile] = state.tiles;
+
+      await registration.implementation.update(state);
+
+      assert.equal(tile.link.getAttribute("href"), null);
+      assert.equal(tile.link.classList.contains("clickable"), false);
+      assert.equal(tile.link.classList.contains("ui-tile"), true);
     }
   );
 });
@@ -178,6 +243,7 @@ test("status renders the representative provider matrix with consistent tile sur
       check: {
         name: "Router",
         icon: "🛜",
+        href: "http://192.168.1.1/",
         provider: { type: "http", url: "192.168.1.1" }
       },
       result: {
@@ -246,6 +312,7 @@ test("status renders the representative provider matrix with consistent tile sur
     {
       check: {
         name: "Expected broken",
+        href: "https://offline.example.test/",
         provider: { type: "http", url: "https://offline.example.test" }
       },
       result: {
@@ -258,6 +325,7 @@ test("status renders the representative provider matrix with consistent tile sur
     {
       check: {
         name: "No destination",
+        href: null,
         provider: { type: "unknown" }
       },
       result: {
@@ -282,9 +350,11 @@ test("status renders the representative provider matrix with consistent tile sur
       const root = new FakeElement("section");
       const state = registration.implementation.mount(root, { props: { checks } });
 
-      for (const tile of state.tiles) {
+      for (const [index, tile] of state.tiles.entries()) {
+        const configuredHref = scenarios[index].check.href || null;
         assert.equal(tile.link.classList.contains("ui-tile"), true);
-        assert.equal(tile.link.classList.contains("clickable"), false);
+        assert.equal(tile.link.classList.contains("clickable"), Boolean(configuredHref));
+        assert.equal(tile.link.getAttribute("href"), configuredHref);
       }
 
       await registration.implementation.update(state);
@@ -298,7 +368,9 @@ test("status renders the representative provider matrix with consistent tile sur
           tile.link,
           (element) => element.classList.contains("icon")
         );
-        const expectedHref = scenario.result.href;
+        const expectedHref = scenario.check.href !== undefined
+          ? scenario.check.href
+          : scenario.result.href;
 
         assert.equal(icons.length, 1, scenario.check.name);
         const [icon] = icons;

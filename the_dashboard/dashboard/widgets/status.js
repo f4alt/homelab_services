@@ -57,6 +57,7 @@ function validCheck(check) {
     && typeof check.name === "string"
     && Boolean(check.name.trim())
     && (check.icon === undefined || check.icon === null || typeof check.icon === "string")
+    && safeHref(check.href) !== undefined
     && isPlainObject(check.provider);
 }
 
@@ -64,6 +65,7 @@ function normalizeCheck(check) {
   return {
     name: check.name.trim(),
     ...(check.icon ? { icon: check.icon } : {}),
+    ...(check.href !== undefined ? { href: safeHref(check.href) } : {}),
     provider: check.provider
   };
 }
@@ -176,7 +178,8 @@ function applyResult(tile, result) {
     `${tile.check.name}: ${normalized.indicator}. ${normalized.detail}`
   );
   tile.popup.textContent = normalized.detail;
-  setLinkHref(tile.link, normalized.href);
+  const href = tile.check.href !== undefined ? tile.check.href : normalized.href;
+  setLinkHref(tile.link, href);
   return true;
 }
 

@@ -75,8 +75,22 @@ Important environment knobs are documented in `.env.example`, including:
 Status checks treat exact `localhost`, `127.0.0.1`, and `::1` targets as ports
 published by the Docker host while preserving those browser-facing URLs. Add
 LAN or external hosts and patterns to `STATUS_PROBE_ALLOWED_HOSTS` only when a
-widget needs them. Each status tile configures a provider under `props.checks`;
-the Gateway currently supports HTTP probes and GitHub Actions workflow runs.
+widget needs them. Each status tile configures a provider under `props.checks`
+and may set a browser-facing `href` to make the tile interactive before its
+first result. When omitted, the provider result may supply the destination
+instead; set `href: null` to keep the tile deliberately non-interactive. For
+example:
+
+```js
+{
+  name: "Router",
+  icon: "🛜",
+  href: "http://192.168.1.1",
+  provider: { type: "http", url: "192.168.1.1" }
+}
+```
+
+The Gateway currently supports HTTP probes and GitHub Actions workflow runs.
 Public GitHub repositories work without credentials. Set the optional
 Gateway-only `GITHUB_TOKEN` to a fine-grained, read-only token when private or
 higher-rate access is needed; the token is never included in dashboard config

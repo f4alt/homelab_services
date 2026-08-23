@@ -87,6 +87,7 @@ window.DASH_CONFIG = {
         checks: [
           {
             name: "BRL-CAD CI",
+            href: "https://github.com/BRL-CAD/brlcad/actions",
             provider: {
               type: "github-actions",
               repository: "BRL-CAD/brlcad",
