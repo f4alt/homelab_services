@@ -5,7 +5,8 @@ import {
   createStack,
   createWidgetMessage,
   fetchJson,
-  installWidgetStyles
+  installWidgetStyles,
+  setFlippableTileState
 } from "../platform/global.js";
 
 const HOME_ASSISTANT_STYLE_ID = "home-assistant-widget-styles";
@@ -52,10 +53,8 @@ function normalizeButtons(buttons) {
 }
 
 function syncTileFlipState(tileView, flipped) {
-  tileView.tile.classList.toggle("flippable-tile--flipped", flipped);
+  setFlippableTileState(tileView, flipped);
   tileView.tile.setAttribute("aria-expanded", String(flipped));
-  tileView.front.setAttribute("aria-hidden", String(flipped));
-  tileView.back.setAttribute("aria-hidden", String(!flipped));
 }
 
 function closeActionResult(state, restoreFocus = false) {
@@ -63,7 +62,7 @@ function closeActionResult(state, restoreFocus = false) {
   if (!tileView) return;
 
   syncTileFlipState(tileView, false);
-  tileView.tile.classList.remove("severity-error", "is-error");
+  tileView.tile.classList.remove("severity-error");
   state.openTileView = null;
   state.resultDismissal.deactivate();
   if (restoreFocus) tileView.tile.focus();
@@ -71,10 +70,10 @@ function closeActionResult(state, restoreFocus = false) {
 
 function showActionResult(state, tileView, message, isError) {
   closeActionResult(state);
-  tileView.back.textContent = message;
   tileView.tile.classList.toggle("severity-error", isError);
   state.openTileView = tileView;
   syncTileFlipState(tileView, true);
+  tileView.back.textContent = message;
   state.resultDismissal.activate();
 }
 

@@ -6,6 +6,7 @@ import {
   createTile,
   fetchJson,
   installWidgetStyles,
+  setFlippableTileState,
   setStateMessage
 } from "../platform/global.js";
 import {
@@ -139,13 +140,11 @@ function renderMenu(state) {
 }
 
 function syncTileFlipState(tileView, flipped) {
-  tileView.tile.classList.toggle("flippable-tile--flipped", flipped);
-  tileView.front.setAttribute("aria-hidden", String(flipped));
-  tileView.backButton.setAttribute("aria-hidden", String(!flipped));
+  setFlippableTileState(tileView, flipped);
   tileView.nameButton.setAttribute("aria-expanded", String(flipped));
   tileView.nameButton.setAttribute("tabindex", flipped ? "-1" : "0");
   tileView.resetButton.setAttribute("tabindex", flipped ? "-1" : "0");
-  tileView.backButton.setAttribute("tabindex", flipped ? "0" : "-1");
+  tileView.back.setAttribute("tabindex", flipped ? "0" : "-1");
 }
 
 function setOpenTileView(state, nextTileView) {
@@ -156,7 +155,7 @@ function setOpenTileView(state, nextTileView) {
   state.openTileView = nextTileView;
   if (nextTileView) {
     syncTileFlipState(nextTileView, true);
-    nextTileView.backButton.focus();
+    nextTileView.back.focus();
   }
 
   if (!previousTileView && nextTileView) {
@@ -219,7 +218,7 @@ function createTileView(state, item, nowMs) {
   const tileView = {
     tile,
     front,
-    backButton,
+    back: backButton,
     details,
     nameButton,
     resetButton,
@@ -254,7 +253,7 @@ function updateTileView(state, tileView, item, nowMs) {
   const accessibleDetails = presentation.details
     .map(({ label, value }) => `${label}: ${value}`)
     .join(". ");
-  tileView.backButton.setAttribute(
+  tileView.back.setAttribute(
     "aria-label",
     `Hide details for ${item.name}. ${accessibleDetails}`
   );

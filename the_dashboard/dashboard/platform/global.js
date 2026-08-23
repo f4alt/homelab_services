@@ -119,6 +119,12 @@ export function createTile(className = "") {
   return createElement("div", `ui-tile ${className}`.trim());
 }
 
+export function setFlippableTileState({ tile, front, back }, flipped) {
+  tile.classList.toggle("flippable-tile--flipped", flipped);
+  front.setAttribute("aria-hidden", String(flipped));
+  back.setAttribute("aria-hidden", String(!flipped));
+}
+
 function prepareFloatingPopup(trigger, popup) {
   if (
     typeof CSS === "undefined" ||
