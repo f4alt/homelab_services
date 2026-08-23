@@ -47,8 +47,7 @@ test("tracked dashboard config preserves the wide layout rhythm", async () => {
       ["status", 5],
       ["netstats", 7],
       ["metar", "all"],
-      ["home_assistant", "all"],
-      ["github_ci_stub", "all"]
+      ["home_assistant", "all"]
     ]
   );
   assert.deepEqual({ ...config.options.grid }, {
@@ -66,10 +65,28 @@ test("tracked dashboard config uses conservative refresh cadences", async () => 
   );
 
   const contentRefreshMs = 5 * 60 * 1000;
-  const serviceStatusRefreshMs = 2 * 60 * 1000;
+  const statusCheckRefreshMs = 2 * 60 * 1000;
   assert.equal(refreshById.calendar, contentRefreshMs);
   assert.equal(refreshById.todos, contentRefreshMs);
   assert.equal(refreshById.time_since, contentRefreshMs);
   assert.equal(refreshById.metar, contentRefreshMs);
-  assert.equal(refreshById.status, serviceStatusRefreshMs);
+  assert.equal(refreshById.status, statusCheckRefreshMs);
+});
+
+test("tracked dashboard config includes the public BRL-CAD Actions check", async () => {
+  const config = await loadTrackedConfig();
+  const statusWidget = config.widgets.find(({ type }) => type === "status");
+
+  assert.deepEqual(Array.from(statusWidget.props.checks, (check) => ({
+    ...check,
+    provider: { ...check.provider }
+  })), [{
+    name: "BRL-CAD CI",
+    provider: {
+      type: "github-actions",
+      repository: "BRL-CAD/brlcad",
+      workflow: "push.yml"
+    }
+  }]);
+  assert.equal("services" in statusWidget.props, false);
 });

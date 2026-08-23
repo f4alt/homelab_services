@@ -221,10 +221,10 @@ check("removed platform API routes stay absent", async () => {
   }
 });
 
-check("status route validates empty target list", async () => {
+check("status route validates an empty provider list", async () => {
   const { response, json } = await request("/api/statuschecks", {
     method: "POST",
-    body: JSON.stringify({ targets: [] })
+    body: JSON.stringify({ providers: [] })
   });
 
   assert(response.status === 400, `expected HTTP 400, got ${response.status}`);
@@ -237,31 +237,34 @@ check("status route probes a browser-facing dashboard host target", async () => 
   const { response, json } = await request("/api/statuschecks", {
     method: "POST",
     body: JSON.stringify({
-      targets: [{ url: target }]
+      providers: [{ type: "http", url: target }]
     })
   });
 
   assert(response.ok, `expected HTTP 2xx, got ${response.status}`);
   assert(json?.ok === true, "statuschecks response did not report ok=true");
-  assert(json?.data?.results?.[0]?.ok === true, "allowed target was not reachable");
-  assert(json.data.results[0].status === 200, "unexpected allowed target status");
-  assert(json.data.results[0].final_url === target, "browser target URL was not preserved");
+  assert(json?.data?.results?.[0]?.indicator === "passing", "allowed target was not reachable");
+  assert(json.data.results[0].detail.startsWith("HTTP 200"), "unexpected allowed target status");
+  assert(json.data.results[0].href === target, "browser target URL was not preserved");
 });
 
 check("status route rejects disallowed target hosts", async () => {
   const { response, json } = await request("/api/statuschecks", {
     method: "POST",
     body: JSON.stringify({
-      targets: [{ url: "example.invalid" }]
+      providers: [{ type: "http", url: "example.invalid" }]
     })
   });
 
   assert(response.ok, `expected HTTP 2xx, got ${response.status}`);
   assert(json?.ok === true, "statuschecks batch should complete");
-  assert(json?.data?.results?.[0]?.ok === false, "disallowed target should fail per-target");
   assert(
-    json.data.results[0]?.error?.code === "target_not_allowed",
-    "disallowed target error code mismatch"
+    json?.data?.results?.[0]?.indicator === "attention",
+    "disallowed target should fail per-check"
+  );
+  assert(
+    json.data.results[0]?.detail.includes("not allowed"),
+    "disallowed target detail mismatch"
   );
 });
 

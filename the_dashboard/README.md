@@ -62,6 +62,7 @@ Important environment knobs are documented in `.env.example`, including:
 - `DASHBOARD_HTTP_PORT`
 - `DASHBOARD_CONFIG_PATH`
 - `GATEWAY_UPSTREAM_TIMEOUT_MS`
+- `GITHUB_TOKEN`
 - `HOME_ASSISTANT_BASE_URL`
 - `HOME_ASSISTANT_TOKEN`
 - `TODO_API_BASE_URL`
@@ -74,7 +75,12 @@ Important environment knobs are documented in `.env.example`, including:
 Status checks treat exact `localhost`, `127.0.0.1`, and `::1` targets as ports
 published by the Docker host while preserving those browser-facing URLs. Add
 LAN or external hosts and patterns to `STATUS_PROBE_ALLOWED_HOSTS` only when a
-widget needs them.
+widget needs them. Each status tile configures a provider under `props.checks`;
+the Gateway currently supports HTTP probes and GitHub Actions workflow runs.
+Public GitHub repositories work without credentials. Set the optional
+Gateway-only `GITHUB_TOKEN` to a fine-grained, read-only token when private or
+higher-rate access is needed; the token is never included in dashboard config
+or status responses.
 
 Gateway uses the fixed internal Compose port `3000`. It is not published on the
 host; only Nginx's `DASHBOARD_HTTP_PORT` is host-facing. Gateway also runs the

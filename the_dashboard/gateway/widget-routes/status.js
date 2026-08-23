@@ -1,200 +1,145 @@
 import { Router } from "express";
+import { CONFIG } from "../platform/config.js";
+import { sendError, sendOk } from "../platform/responses.js";
+import { createGitHubActionsStatusProvider } from "../status-providers/github-actions.js";
+import { createHttpStatusProvider } from "../status-providers/http.js";
 import {
-  CONFIG,
-  DOCKER_HOST_ALIAS,
-  hostIsAllowed,
-  hostIsLocal
-} from "../platform/config.js";
-import {
-  errorMessage,
-  errorPayload,
-  sendError,
-  sendOk
-} from "../platform/responses.js";
+  attentionResult,
+  isStatusIndicator
+} from "../status-providers/result.js";
 
-const router = Router();
-const HTTP_SCHEME = "http";
-const HTTP_SCHEMES = Object.freeze([HTTP_SCHEME, "https"]);
-const EXPLICIT_HTTP_URL_PATTERN = /^https?:\/\//i;
+const PROVIDER_FAILURE_DETAIL = "Status provider failed.";
+const INVALID_RESULT_DETAIL = "Status provider returned an invalid result.";
+const BATCH_TIMEOUT_DETAIL = "Status check timed out.";
 
-function asUrl(raw, scheme) {
-  const value = String(raw || "").trim();
-  if (!value || /[\s@]/.test(value)) {
-    return null;
+function normalizedHref(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string" || !value.trim()) return undefined;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.toString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeProviderResult(result) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    return attentionResult(INVALID_RESULT_DETAIL);
+  }
+
+  const detail = typeof result.detail === "string" ? result.detail.trim() : "";
+  const href = normalizedHref(result.href);
+  if (!isStatusIndicator(result.indicator) || !detail || href === undefined) {
+    return attentionResult(INVALID_RESULT_DETAIL);
+  }
+
+  return { indicator: result.indicator, detail, href };
+}
+
+async function evaluateProvider(providerConfig, providers) {
+  if (!providerConfig || typeof providerConfig !== "object" || Array.isArray(providerConfig)) {
+    return attentionResult("Provider configuration must be an object.");
+  }
+
+  const type = typeof providerConfig.type === "string"
+    ? providerConfig.type.trim()
+    : "";
+  if (!type) return attentionResult("Provider type is required.");
+  if (!Object.hasOwn(providers, type)) {
+    return attentionResult(`Unknown status provider "${type}".`);
   }
 
   try {
-    return new URL(EXPLICIT_HTTP_URL_PATTERN.test(value) ? value : `${scheme}://${value}`);
+    return normalizeProviderResult(await providers[type].check(providerConfig));
   } catch {
-    return null;
+    return attentionResult(PROVIDER_FAILURE_DETAIL);
   }
 }
 
-function normalizeCandidates(raw) {
-  const value = String(raw || "").trim();
-
-  if (EXPLICIT_HTTP_URL_PATTERN.test(value)) {
-    const url = asUrl(value, HTTP_SCHEME);
-    return url ? [url] : [];
-  }
-
-  return HTTP_SCHEMES.map((scheme) => asUrl(value, scheme)).filter(Boolean);
-}
-
-function validateTarget(raw, allowedHosts) {
-  const candidates = normalizeCandidates(raw);
-
-  if (!candidates.length) {
-    return {
-      ok: false,
-      error: errorPayload("invalid_target", "Target must be a hostname, IP, or http(s) URL.")
-    };
-  }
-
-  const disallowed = candidates.find((url) => (
-    !hostIsLocal(url.hostname)
-    && !hostIsAllowed(url.hostname, allowedHosts)
-  ));
-  if (disallowed) {
-    return {
-      ok: false,
-      error: errorPayload("target_not_allowed", `Target host "${disallowed.hostname}" is not allowed.`)
-    };
-  }
-
-  return { ok: true, candidates };
-}
-
-function probeTransportUrl(browserUrl) {
-  const transportUrl = new URL(browserUrl);
-  if (hostIsLocal(transportUrl.hostname)) {
-    transportUrl.hostname = DOCKER_HOST_ALIAS;
-  }
-  return transportUrl;
-}
-
-async function tryFetch(url, {
-  fetchImpl,
-  monotonicNow,
-  signalForTimeout,
-  timeoutMs
-}) {
-  const startedAt = monotonicNow();
-  const response = await fetchImpl(url, {
-    method: "GET",
-    redirect: "manual",
-    signal: signalForTimeout(timeoutMs)
-  });
-  const finishedAt = monotonicNow();
-  return { response, ms: Math.round(finishedAt - startedAt) };
-}
-
-export function createStatusProbe({
-  allowedHosts = CONFIG.statusProbe.allowedHosts,
-  fetchImpl = fetch,
-  monotonicNow = () => performance.now(),
-  now = () => new Date(),
-  signalForTimeout = (timeoutMs) => AbortSignal.timeout(timeoutMs),
-  timeoutMs = CONFIG.statusProbe.timeoutMs
-} = {}) {
-  return async function probe(raw) {
-    const timestamp = now().toISOString();
-    const validation = validateTarget(raw, allowedHosts);
-
-    if (!validation.ok) {
-      return {
-        ok: false,
-        target: raw,
-        error: validation.error,
-        timestamp
-      };
-    }
-
-    for (const browserUrl of validation.candidates) {
-      try {
-        const transportUrl = probeTransportUrl(browserUrl);
-        const { response, ms } = await tryFetch(transportUrl, {
-          fetchImpl,
-          monotonicNow,
-          signalForTimeout,
-          timeoutMs
-        });
-        return {
-          ok: true,
-          target: raw,
-          final_url: browserUrl.toString(),
-          status: response.status,
-          latency_ms: ms,
-          timestamp
-        };
-      } catch {
-        continue;
-      }
-    }
-
-    return {
-      ok: false,
-      target: raw,
-      error: errorPayload("no_response", "No response from target."),
-      timestamp
-    };
-  };
-}
-
-const probeStatus = createStatusProbe();
-
-async function mapWithConcurrency(items, concurrency, mapper) {
+async function mapWithConcurrency(items, concurrency, mapper, deadlineMs) {
   const results = new Array(items.length);
   let nextIndex = 0;
+  let deadlineReached = false;
 
   async function worker() {
-    while (nextIndex < items.length) {
+    while (!deadlineReached && nextIndex < items.length) {
       const index = nextIndex;
       nextIndex += 1;
       results[index] = await mapper(items[index], index);
     }
   }
 
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    () => worker()
-  );
-  await Promise.all(workers);
+  const workerCount = Math.min(concurrency, items.length);
+  const workers = Promise.all(Array.from({ length: workerCount }, () => worker()));
+  let deadlineTimer;
+  const deadline = new Promise((resolve) => {
+    deadlineTimer = setTimeout(() => {
+      deadlineReached = true;
+      resolve(false);
+    }, deadlineMs);
+  });
+  const completed = await Promise.race([workers.then(() => true), deadline]);
+  if (completed) clearTimeout(deadlineTimer);
 
-  return results;
+  return Array.from(
+    { length: items.length },
+    (_, index) => results[index] || attentionResult(BATCH_TIMEOUT_DETAIL)
+  );
 }
 
-router.post("/statuschecks", async (req, res) => {
-  try {
-    const targets = Array.isArray(req.body?.targets) ? req.body.targets : [];
-    if (!targets.length) {
-      return sendError(res, 400, "validation_error", "No targets provided.");
+export function createStatusProviderRegistry() {
+  return Object.freeze({
+    http: createHttpStatusProvider(),
+    "github-actions": createGitHubActionsStatusProvider()
+  });
+}
+
+export function createStatusChecksHandler({
+  batchDeadlineMs = CONFIG.statusChecks.batchDeadlineMs,
+  concurrency = CONFIG.statusChecks.concurrency,
+  maxChecks = CONFIG.statusChecks.maxChecks,
+  providers = createStatusProviderRegistry()
+} = {}) {
+  return async function statusChecksHandler(req, res) {
+    const providerConfigs = Array.isArray(req.body?.providers) ? req.body.providers : [];
+    if (!providerConfigs.length) {
+      return sendError(res, 400, "validation_error", "No status providers provided.");
     }
 
-    if (targets.length > CONFIG.statusProbe.maxTargets) {
+    if (providerConfigs.length > maxChecks) {
       return sendError(
         res,
         400,
         "validation_error",
-        `Too many targets. Maximum is ${CONFIG.statusProbe.maxTargets}.`
+        `Too many status providers. Maximum is ${maxChecks}.`
       );
     }
 
-    const results = await mapWithConcurrency(
-      targets,
-      CONFIG.statusProbe.concurrency,
-      (target) => probeStatus(String(target?.url || "").trim())
-    );
+    try {
+      const results = await mapWithConcurrency(
+        providerConfigs,
+        concurrency,
+        (providerConfig) => evaluateProvider(providerConfig, providers),
+        batchDeadlineMs
+      );
 
-    return sendOk(res, {
-      count: results.length,
-      results
-    });
-  } catch (error) {
-    return sendError(res, 500, "internal_error", "Status checks failed.", {
-      error: errorMessage(error)
-    });
-  }
-});
+      return sendOk(res, { count: results.length, results });
+    } catch {
+      return sendError(
+        res,
+        500,
+        "internal_error",
+        "Status checks could not be completed."
+      );
+    }
+  };
+}
+
+const router = Router();
+router.post("/statuschecks", createStatusChecksHandler());
 
 export default router;

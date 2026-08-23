@@ -11,6 +11,7 @@ RUN npm ci --omit=dev
 
 COPY gateway.js ./
 COPY platform/ ./platform/
+COPY status-providers/ ./status-providers/
 COPY widget-routes/ ./widget-routes/
 
 ENV NODE_ENV=production

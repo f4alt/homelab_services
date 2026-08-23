@@ -8,6 +8,18 @@ import {
 } from "../platform/global.js";
 
 const STATUS_STYLE_ID = "status-inline-styles";
+// Gateway batches stop at 90 seconds and Nginx at 100, leaving time for response delivery.
+const STATUS_BATCH_TIMEOUT_MS = 2 * 60 * 1000;
+const INITIAL_DETAIL = "Checking…";
+const GATEWAY_UNAVAILABLE_WARNING = "Gateway unavailable.";
+const STALE_RESULTS_WARNING = "Refresh failed; showing previous results.";
+const INVALID_CHECKS_WARNING = "Some status checks have invalid configuration.";
+const INVALID_RESULTS_WARNING = "Some status results were invalid.";
+const INDICATOR_CLASSES = Object.freeze({
+  passing: "dot--ok",
+  attention: "dot--err",
+  other: "dot--warn"
+});
 const STATUS_STYLES = `
     .status-tile {
       align-items: center;
@@ -20,27 +32,49 @@ const STATUS_STYLES = `
       --dot-size: 16px;
       --popup-transform: translate(-20%, -90%);
     }
+
+    .status-refresh-warning {
+      color: var(--warn-muted);
+    }
   `;
 
-async function tryStatusChecks(services, signal) {
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function validCheck(check) {
+  return isPlainObject(check)
+    && typeof check.name === "string"
+    && Boolean(check.name.trim())
+    && (check.icon === undefined || check.icon === null || typeof check.icon === "string")
+    && isPlainObject(check.provider);
+}
+
+function normalizeCheck(check) {
+  return {
+    name: check.name.trim(),
+    ...(check.icon ? { icon: check.icon } : {}),
+    provider: check.provider
+  };
+}
+
+async function tryStatusChecks(checks) {
   const data = await fetchJson("/statuschecks", {
+    timeoutMs: STATUS_BATCH_TIMEOUT_MS,
     fetchOptions: {
       method: "POST",
       body: JSON.stringify({
-        targets: services.map((service) => ({ url: service.url }))
-      }),
-      signal
+        providers: checks.map((check) => check.provider)
+      })
     }
   });
-  return Array.isArray(data?.results) ? data.results : [];
+  if (!Array.isArray(data?.results)) {
+    throw new Error("Status Gateway returned malformed results.");
+  }
+  return data.results;
 }
 
-function linkForTarget(target) {
-  const value = String(target || "");
-  return /^https?:\/\//i.test(value) ? value : `http://${value}`;
-}
-
-function createStyledIcon(icon) {
+function createStyledIcon(icon, checkName) {
   const iconBox = createElement("div", "icon");
 
   if (!icon) {
@@ -49,10 +83,10 @@ function createStyledIcon(icon) {
   }
 
   if (String(icon).startsWith("/") || String(icon).startsWith("http")) {
-    const img = document.createElement("img");
-    img.src = icon;
-    img.alt = "icon";
-    iconBox.appendChild(img);
+    const image = document.createElement("img");
+    image.src = icon;
+    image.alt = `${checkName} icon`;
+    iconBox.appendChild(image);
     return iconBox;
   }
 
@@ -60,117 +94,147 @@ function createStyledIcon(icon) {
   return iconBox;
 }
 
+function createStatusTile(check) {
+  const link = document.createElement("a");
+  const tile = createElement("div", "status-tile");
+  const dotWrap = createElement("div", "popup-on-hover status-popup-target");
+  const dot = createElement("div", "dot");
+  const popup = createElement("div", "popup label-info");
+  const name = createElement("div", "label", check.name);
+
+  dot.setAttribute("tabindex", "0");
+  dot.setAttribute("role", "img");
+  dotWrap.append(dot, popup);
+  bindHoverPopup(dotWrap, popup);
+  tile.append(dotWrap, createStyledIcon(check.icon, check.name), name);
+  link.appendChild(tile);
+
+  const statusTile = { check, dot, link, popup };
+  applyResult(statusTile, { indicator: "other", detail: INITIAL_DETAIL, href: null });
+  return statusTile;
+}
+
+function safeHref(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string" || !value.trim()) return undefined;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.toString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizedResult(result) {
+  if (!isPlainObject(result)) return null;
+
+  const indicatorClass = INDICATOR_CLASSES[result.indicator];
+  const detail = typeof result.detail === "string" ? result.detail.trim() : "";
+  const href = safeHref(result.href);
+  if (!indicatorClass || !detail || href === undefined) return null;
+
+  return { indicator: result.indicator, indicatorClass, detail, href };
+}
+
+function setLinkHref(link, href) {
+  if (href) {
+    link.setAttribute("href", href);
+    link.setAttribute("target", "_blank");
+    link.setAttribute("rel", "noopener noreferrer");
+    link.classList.add("clickable");
+    return;
+  }
+
+  link.removeAttribute("href");
+  link.removeAttribute("target");
+  link.removeAttribute("rel");
+  link.classList.remove("clickable");
+}
+
+function applyResult(tile, result) {
+  const normalized = normalizedResult(result);
+  if (!normalized) return false;
+
+  tile.dot.className = `dot ${normalized.indicatorClass}`;
+  tile.dot.dataset.tip = normalized.detail;
+  tile.dot.setAttribute(
+    "aria-label",
+    `${tile.check.name}: ${normalized.indicator}. ${normalized.detail}`
+  );
+  tile.popup.textContent = normalized.detail;
+  setLinkHref(tile.link, normalized.href);
+  return true;
+}
+
+function syncWarning(state) {
+  state.warning.textContent = state.refreshWarning || state.configWarning;
+}
+
 window.DASH.registerWidget("status", {
   mount(root, { props = {} }) {
     installWidgetStyles(STATUS_STYLE_ID, STATUS_STYLES);
 
+    const configuredChecks = Array.isArray(props.checks) ? props.checks : [];
+    const checks = configuredChecks.filter(validCheck).map(normalizeCheck);
+    const invalidCheckCount = configuredChecks.length - checks.length;
     const grid = createResponsiveGrid(props);
-    root.replaceChildren(grid);
+    const warning = createElement("div", "label-info status-refresh-warning widget-status");
+    warning.setAttribute("role", "status");
+    warning.setAttribute("aria-live", "polite");
+    root.replaceChildren(grid, warning);
 
-    const services = Array.isArray(props?.services) ? props.services : [];
-    if (!services.length) {
-      setStateMessage(grid, "No status checks configured.", "empty");
-    }
-    const tiles = [];
-
-    for (const service of services) {
-      const link = document.createElement("a");
-      link.className = "clickable";
-      link.href = linkForTarget(service.url);
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-
-      const tile = document.createElement("div");
-      tile.className = "status-tile";
-      const dotWrap = document.createElement("div");
-      dotWrap.className = "popup-on-hover status-popup-target";
-
-      const dot = document.createElement("div");
-      dot.className = "dot dot--warn";
-      dot.setAttribute("tabindex", "0");
-      dot.setAttribute("role", "img");
-      dot.setAttribute("aria-label", `${service.name || service.url} status unknown`);
-      dot.dataset.tip = "checking…";
-
-      const popup = document.createElement("div");
-      popup.className = "popup label-info";
-      popup.textContent = dot.dataset.tip;
-      const iconBox = createStyledIcon(service.icon);
-      const name = document.createElement("div");
-      name.className = "label";
-      name.textContent = service.name || service.url;
-
-      dotWrap.append(dot, popup);
-      bindHoverPopup(dotWrap, popup);
-      tile.append(dotWrap, iconBox, name);
-      link.appendChild(tile);
-      grid.appendChild(link);
-      tiles.push({ service, dot, link, popup });
+    if (!checks.length) {
+      setStateMessage(grid, "No valid status checks configured.", "empty");
     }
 
-    return { services, tiles, aborter: null };
+    const tiles = checks.map(createStatusTile);
+    for (const tile of tiles) grid.appendChild(tile.link);
+
+    const state = {
+      checks,
+      configWarning: invalidCheckCount > 0 ? INVALID_CHECKS_WARNING : "",
+      hasSuccessfulBatch: false,
+      refreshWarning: "",
+      tiles,
+      updating: false,
+      warning
+    };
+    syncWarning(state);
+    return state;
   },
 
   async update(state) {
-    const { services, tiles } = state;
-    if (!services.length) return;
-
-    state.aborter?.abort();
-    const aborter = new AbortController();
-    state.aborter = aborter;
+    if (!state.checks.length || state.updating) return;
+    state.updating = true;
 
     try {
-      const results = await tryStatusChecks(services, aborter.signal);
-      if (state.aborter !== aborter || aborter.signal.aborted) return;
+      let results;
+      try {
+        results = await tryStatusChecks(state.checks);
+      } catch {
+        state.refreshWarning = state.hasSuccessfulBatch
+          ? STALE_RESULTS_WARNING
+          : GATEWAY_UNAVAILABLE_WARNING;
+        syncWarning(state);
+        return;
+      }
 
-      const resultsByTarget = new Map(results.map((result) => [result.target, result]));
-      for (const { service, dot, link, popup } of tiles) {
-        const result = resultsByTarget.get(service.url);
-        if (!result) {
-          dot.className = "dot dot--warn";
-          const tip = "no data";
-          dot.dataset.tip = tip;
-          dot.setAttribute("aria-label", `${service.name || service.url} status unknown`);
-          popup.textContent = tip;
-          link.href = linkForTarget(service.url);
-          continue;
-        }
-
-        if (result.ok) {
-          dot.className = "dot dot--ok";
-          const code = result.status ?? 0;
-          const milliseconds = result.latency_ms ?? 0;
-          const tip = `HTTP ${code} • ${milliseconds}ms`;
-          dot.dataset.tip = tip;
-          dot.setAttribute("aria-label", `${service.name || service.url} up — ${tip}`);
-          popup.textContent = tip;
-          link.href = result.final_url ? result.final_url : linkForTarget(service.url);
-        } else {
-          dot.className = "dot dot--err";
-          const message = (result.error?.message || result.error || "down")
-            .replace(/^Error:\s*/i, "");
-          dot.dataset.tip = message;
-          dot.setAttribute("aria-label", `${service.name || service.url} down — ${message}`);
-          popup.textContent = message;
-          link.href = linkForTarget(service.url);
+      let appliedResultCount = 0;
+      for (let index = 0; index < state.tiles.length; index += 1) {
+        if (applyResult(state.tiles[index], results[index])) {
+          appliedResultCount += 1;
         }
       }
-    } catch {
-      if (state.aborter !== aborter || aborter.signal.aborted) return;
-
-      for (const { service, dot, link, popup } of tiles) {
-        dot.className = "dot dot--warn";
-        const tip = "gateway unreachable";
-        dot.dataset.tip = tip;
-        dot.setAttribute(
-          "aria-label",
-          `${service.name || service.url} status unknown (gateway)`
-        );
-        popup.textContent = tip;
-        link.href = linkForTarget(service.url);
-      }
+      if (appliedResultCount > 0) state.hasSuccessfulBatch = true;
+      state.refreshWarning = appliedResultCount === state.tiles.length
+        ? ""
+        : INVALID_RESULTS_WARNING;
+      syncWarning(state);
     } finally {
-      if (state.aborter === aborter) state.aborter = null;
+      state.updating = false;
     }
   }
 });

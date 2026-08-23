@@ -1,5 +1,9 @@
 export const DOCKER_HOST_ALIAS = "host.docker.internal";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const MINUTE_MS = 60_000;
+const GITHUB_RUN_CACHE_MS = 5 * MINUTE_MS;
+const GITHUB_DEFAULT_BRANCH_CACHE_MS = 60 * MINUTE_MS;
+const STATUS_BATCH_DEADLINE_MS = 90_000;
 
 function parsePositiveInt(env, name, fallback) {
   const raw = env[name] ?? String(fallback);
@@ -62,6 +66,10 @@ export function hostIsAllowed(hostname, patterns) {
 }
 
 function readGatewayConfig(env = process.env) {
+  const upstreamTimeoutMs = parsePositiveInt(env, "GATEWAY_UPSTREAM_TIMEOUT_MS", 5000);
+  const statusCheckConcurrency = parsePositiveInt(env, "STATUS_PROBE_CONCURRENCY", 10);
+  const statusCheckMaximum = parsePositiveInt(env, "STATUS_PROBE_MAX_TARGETS", 100);
+
   return {
     port: 3000,
     pingTarget: env.PING_TARGET || "8.8.8.8",
@@ -76,11 +84,21 @@ function readGatewayConfig(env = process.env) {
     },
     dashboardConfigPath: "/dashboard/config.js",
     dashboardConfigValidatorPath: "/dashboard/platform/config-validator.mjs",
-    upstreamTimeoutMs: parsePositiveInt(env, "GATEWAY_UPSTREAM_TIMEOUT_MS", 5000),
+    upstreamTimeoutMs,
+    statusChecks: {
+      batchDeadlineMs: STATUS_BATCH_DEADLINE_MS,
+      concurrency: statusCheckConcurrency,
+      maxChecks: statusCheckMaximum
+    },
+    githubActions: {
+      apiBaseUrl: "https://api.github.com",
+      token: String(env.GITHUB_TOKEN || "").trim(),
+      timeoutMs: upstreamTimeoutMs,
+      runCacheMs: GITHUB_RUN_CACHE_MS,
+      defaultBranchCacheMs: GITHUB_DEFAULT_BRANCH_CACHE_MS
+    },
     statusProbe: {
       timeoutMs: parsePositiveInt(env, "STATUS_PROBE_TIMEOUT_MS", 5000),
-      maxTargets: parsePositiveInt(env, "STATUS_PROBE_MAX_TARGETS", 100),
-      concurrency: parsePositiveInt(env, "STATUS_PROBE_CONCURRENCY", 10),
       allowedHosts: parseCsv(
         env,
         "STATUS_PROBE_ALLOWED_HOSTS",

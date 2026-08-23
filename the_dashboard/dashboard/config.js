@@ -1,5 +1,5 @@
 const CONTENT_REFRESH_MS = 5 * 60 * 1000;
-const SERVICE_STATUS_REFRESH_MS = 2 * 60 * 1000;
+const STATUS_CHECK_REFRESH_MS = 2 * 60 * 1000;
 
 window.DASH_CONFIG = {
   apiBase: "/api",
@@ -82,9 +82,18 @@ window.DASH_CONFIG = {
       type: "status",
       id: "status",
       width: 5,
-      refreshMs: SERVICE_STATUS_REFRESH_MS,
+      refreshMs: STATUS_CHECK_REFRESH_MS,
       props: {
-        services: []
+        checks: [
+          {
+            name: "BRL-CAD CI",
+            provider: {
+              type: "github-actions",
+              repository: "BRL-CAD/brlcad",
+              workflow: "push.yml"
+            }
+          }
+        ]
       }
     },
     {
@@ -114,14 +123,6 @@ window.DASH_CONFIG = {
       refreshMs: 0,
       props: {
         buttons: []
-      }
-    },
-    {
-      type: "text",
-      id: "github_ci_stub",
-      width: "all",
-      props: {
-        text: "GitHub CI intent placeholder. This likely belongs in a dedicated status instance if CI targets would inflate the current status widget."
       }
     }
   ]
