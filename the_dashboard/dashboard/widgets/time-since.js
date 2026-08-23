@@ -21,28 +21,7 @@ const TIME_SINCE_STYLE_ID = "time-since-widget-styles";
 
 const TIME_SINCE_STYLES = `
     .time-since-tile {
-      --time-since-flip-duration: 300ms;
-      --time-since-flip-perspective: 48rem;
-
-      perspective: var(--time-since-flip-perspective);
       text-align: center;
-    }
-
-    .time-since-flipper {
-      display: grid;
-      transform-style: preserve-3d;
-      transition: transform var(--time-since-flip-duration) ease;
-      width: 100%;
-    }
-
-    .time-since-tile--flipped .time-since-flipper {
-      transform: rotateY(180deg);
-    }
-
-    .time-since-face {
-      backface-visibility: hidden;
-      grid-area: 1 / 1;
-      min-width: 0;
     }
 
     .time-since-face--front {
@@ -50,7 +29,6 @@ const TIME_SINCE_STYLES = `
       display: grid;
       gap: var(--space-sm);
       justify-items: center;
-      transform: rotateY(0deg);
     }
 
     .time-since-face--back {
@@ -62,7 +40,6 @@ const TIME_SINCE_STYLES = `
       display: grid;
       padding: 0;
       text-align: left;
-      transform: rotateY(180deg);
       width: 100%;
     }
 
@@ -120,12 +97,6 @@ const TIME_SINCE_STYLES = `
     .time-since-reset-button:disabled {
       color: var(--muted);
     }
-
-    @media (prefers-reduced-motion: reduce) {
-      .time-since-flipper {
-        transition: none;
-      }
-    }
   `;
 
 function availableSources(items) {
@@ -168,7 +139,7 @@ function renderMenu(state) {
 }
 
 function syncTileFlipState(tileView, flipped) {
-  tileView.tile.classList.toggle("time-since-tile--flipped", flipped);
+  tileView.tile.classList.toggle("flippable-tile--flipped", flipped);
   tileView.front.setAttribute("aria-hidden", String(flipped));
   tileView.backButton.setAttribute("aria-hidden", String(!flipped));
   tileView.nameButton.setAttribute("aria-expanded", String(flipped));
@@ -219,9 +190,12 @@ function renderDetails(container, details) {
 }
 
 function createTileView(state, item, nowMs) {
-  const tile = createTile("time-since-tile");
-  const flipper = createElement("div", "time-since-flipper");
-  const front = createElement("div", "time-since-face time-since-face--front");
+  const tile = createTile("flippable-tile time-since-tile");
+  const flipper = createElement("div", "flippable-tile-inner");
+  const front = createElement(
+    "div",
+    "flippable-tile-face flippable-tile-face--front time-since-face time-since-face--front"
+  );
   const nameButton = document.createElement("button");
   nameButton.type = "button";
   nameButton.className = "label truncate time-since-name time-since-name-button";
@@ -229,7 +203,12 @@ function createTileView(state, item, nowMs) {
   resetButton.type = "button";
   const backButton = document.createElement("button");
   backButton.type = "button";
-  backButton.className = "time-since-face time-since-face--back";
+  backButton.className = [
+    "flippable-tile-face",
+    "flippable-tile-face--back",
+    "time-since-face",
+    "time-since-face--back"
+  ].join(" ");
   const details = createElement("span", "time-since-details");
 
   front.append(resetButton, nameButton);

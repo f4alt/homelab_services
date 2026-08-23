@@ -1,10 +1,36 @@
 import {
+  createDismissalController,
   createElement,
   createResponsiveGrid,
   createStack,
   createWidgetMessage,
-  fetchJson
+  fetchJson,
+  installWidgetStyles
 } from "../platform/global.js";
+
+const HOME_ASSISTANT_STYLE_ID = "home-assistant-widget-styles";
+const HOME_ASSISTANT_STYLES = `
+    .home-assistant-tile {
+      text-align: center;
+      width: 100%;
+    }
+
+    .home-assistant-tile.severity-error {
+      padding: var(--clickable-padding, var(--widget-padding));
+    }
+
+    .home-assistant-face {
+      align-items: center;
+      display: flex;
+      justify-content: center;
+      overflow-wrap: anywhere;
+    }
+
+    .home-assistant-tile:disabled {
+      color: var(--muted);
+      cursor: wait;
+    }
+  `;
 
 function isPlainObject(value) {
   if (!value || typeof value !== "object") return false;
@@ -25,17 +51,66 @@ function normalizeButtons(buttons) {
   });
 }
 
-function createActionButton(action, status) {
-  const button = createElement("button", "clickable", action.name);
-  button.type = "button";
-  let pending = false;
+function syncTileFlipState(tileView, flipped) {
+  tileView.tile.classList.toggle("flippable-tile--flipped", flipped);
+  tileView.tile.setAttribute("aria-expanded", String(flipped));
+  tileView.front.setAttribute("aria-hidden", String(flipped));
+  tileView.back.setAttribute("aria-hidden", String(!flipped));
+}
 
-  button.addEventListener("click", async () => {
-    if (pending) return;
+function closeActionResult(state, restoreFocus = false) {
+  const tileView = state.openTileView;
+  if (!tileView) return;
 
-    pending = true;
-    button.disabled = true;
-    status.textContent = "";
+  syncTileFlipState(tileView, false);
+  tileView.tile.classList.remove("severity-error", "is-error");
+  state.openTileView = null;
+  state.resultDismissal.deactivate();
+  if (restoreFocus) tileView.tile.focus();
+}
+
+function showActionResult(state, tileView, message, isError) {
+  closeActionResult(state);
+  tileView.back.textContent = message;
+  tileView.tile.classList.toggle("severity-error", isError);
+  state.openTileView = tileView;
+  syncTileFlipState(tileView, true);
+  state.resultDismissal.activate();
+}
+
+function createActionTile(state, action) {
+  const tile = createElement(
+    "button",
+    "clickable flippable-tile home-assistant-tile"
+  );
+  tile.type = "button";
+  const flipper = createElement("span", "flippable-tile-inner");
+  const front = createElement(
+    "span",
+    "flippable-tile-face flippable-tile-face--front home-assistant-face home-assistant-face--front",
+    action.name
+  );
+  const back = createElement(
+    "span",
+    "flippable-tile-face flippable-tile-face--back home-assistant-face home-assistant-face--back widget-status"
+  );
+  back.setAttribute("aria-live", "polite");
+  flipper.append(front, back);
+  tile.appendChild(flipper);
+
+  const tileView = { back, front, pending: false, tile };
+  syncTileFlipState(tileView, false);
+
+  tile.addEventListener("click", async () => {
+    if (state.openTileView === tileView) {
+      closeActionResult(state);
+      return;
+    }
+    if (tileView.pending) return;
+
+    tileView.pending = true;
+    tile.disabled = true;
+    back.textContent = "";
 
     try {
       await fetchJson("/home-assistant/actions", {
@@ -44,29 +119,39 @@ function createActionButton(action, status) {
           body: JSON.stringify({ api: action.api })
         }
       });
-      status.textContent = `Ran ${action.name}.`;
+      showActionResult(state, tileView, `Ran ${action.name}.`, false);
     } catch (error) {
-      status.textContent = String(error?.message || `Unable to run ${action.name}.`);
+      showActionResult(
+        state,
+        tileView,
+        String(error?.message || `Unable to run ${action.name}.`),
+        true
+      );
     } finally {
-      pending = false;
-      button.disabled = false;
+      tileView.pending = false;
+      tile.disabled = false;
     }
   });
 
-  return button;
+  return tile;
 }
 
 window.DASH.registerWidget("home-assistant", {
   mount(root, { props = {} }) {
+    installWidgetStyles(HOME_ASSISTANT_STYLE_ID, HOME_ASSISTANT_STYLES);
+
     const shell = createStack();
     shell.classList.add("widget-body");
 
-    const status = createWidgetMessage("", "widget-status");
-    status.setAttribute("aria-live", "polite");
     const actions = createResponsiveGrid(props);
+    const state = { openTileView: null, resultDismissal: null };
+    state.resultDismissal = createDismissalController({
+      containsTarget: (target) => state.openTileView?.tile.contains(target) || false,
+      onDismiss: ({ restoreFocus }) => closeActionResult(state, restoreFocus)
+    });
     const configuredActions = normalizeButtons(props.buttons);
     for (const action of configuredActions) {
-      actions.appendChild(createActionButton(action, status));
+      actions.appendChild(createActionTile(state, action));
     }
     if (configuredActions.length === 0) {
       actions.appendChild(
@@ -74,7 +159,7 @@ window.DASH.registerWidget("home-assistant", {
       );
     }
 
-    shell.append(actions, status);
+    shell.appendChild(actions);
     root.replaceChildren(shell);
   }
 });

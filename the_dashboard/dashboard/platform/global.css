@@ -243,6 +243,44 @@ body {
   --tile-radius: var(--radius-compact);
 }
 
+.flippable-tile {
+  --flippable-tile-duration: 300ms;
+  --flippable-tile-perspective: 48rem;
+
+  perspective: var(--flippable-tile-perspective);
+}
+
+.flippable-tile-inner {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform var(--flippable-tile-duration) ease;
+  width: 100%;
+}
+
+.flippable-tile--flipped .flippable-tile-inner {
+  transform: rotateY(180deg);
+}
+
+.flippable-tile-face {
+  backface-visibility: hidden;
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.flippable-tile-face--front {
+  transform: rotateY(0deg);
+}
+
+.flippable-tile-face--back {
+  transform: rotateY(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flippable-tile-inner {
+    transition: none;
+  }
+}
+
 .center-overlay {
   align-items: center;
   color: var(--fg);

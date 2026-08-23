@@ -5,6 +5,7 @@ import {
   FakeDocument,
   FakeElement,
   findAll,
+  findByClass,
   treeText
 } from "./helpers/fake-dom.mjs";
 import {
@@ -31,6 +32,7 @@ function findByAttribute(element, name, value) {
 
 async function withHomeAssistantWidget(fetchImplementation, run) {
   let registration;
+  const fakeDocument = new FakeDocument();
   const window = {
     DASH_CONFIG: { apiBase: "/api" },
     DASH: {
@@ -41,13 +43,13 @@ async function withHomeAssistantWidget(fetchImplementation, run) {
   };
 
   await withPatchedGlobals({
-    document: new FakeDocument(),
+    document: fakeDocument,
     fetch: fetchImplementation,
     window
   }, async () => {
     widgetImportNumber += 1;
     await import(`../dashboard/widgets/home-assistant.js?test=${widgetImportNumber}`);
-    await run({ registration });
+    await run({ fakeDocument, registration });
   });
 }
 
@@ -71,7 +73,7 @@ test("home-assistant registers as a static action-only widget", async () => {
     assert.equal(typeof registration.implementation.update, "undefined");
     assert.equal(links.length, 0);
     assert.deepEqual(
-      findAllByTag(root, "button").map((button) => button.textContent),
+      findAllByTag(root, "button").map((button) => treeText(button).trim()),
       ["Office Focus"]
     );
     assert.equal(treeText(root).includes("Open Home Assistant"), false);
@@ -96,7 +98,7 @@ test("home-assistant renders only valid named actions in declared order", async 
     });
 
     assert.deepEqual(
-      findAllByTag(root, "button").map((button) => button.textContent),
+      findAllByTag(root, "button").map((button) => treeText(button).trim()),
       ["Office Focus", "All Lights Off"]
     );
   });
@@ -144,9 +146,54 @@ test("a Home Assistant action posts only its path and prevents duplicate pending
   });
 });
 
-test("an action failure re-enables only its button and keeps the other controls usable", async () => {
+test("a completed Home Assistant action flips its tile to the result and flips back on click", async () => {
+  const requests = [];
+  await withHomeAssistantWidget(async (url, options) => {
+    requests.push({ url, options });
+    return createSuccessResponse({ api: "/api/services/script/dashboard_office_focus" });
+  }, async ({ fakeDocument, registration }) => {
+    const root = new FakeElement("section");
+    registration.implementation.mount(root, {
+      props: {
+        buttons: [{
+          name: "Office Focus",
+          api: "/api/services/script/dashboard_office_focus"
+        }]
+      }
+    });
+    const tile = findByClass(root, "home-assistant-tile");
+    const front = findByClass(tile, "home-assistant-face--front");
+    const back = findByClass(tile, "home-assistant-face--back");
+
+    assert.equal(tile.classList.contains("flippable-tile--flipped"), false);
+    assert.equal(front.getAttribute("aria-hidden"), "false");
+    assert.equal(back.getAttribute("aria-hidden"), "true");
+
+    await tile.fireAsync("click");
+
+    assert.equal(requests.length, 1);
+    assert.equal(tile.classList.contains("flippable-tile--flipped"), true);
+    assert.equal(front.getAttribute("aria-hidden"), "true");
+    assert.equal(back.getAttribute("aria-hidden"), "false");
+    assert.equal(back.textContent, "Ran Office Focus.");
+    assert.equal(fakeDocument.listenerCount("click"), 1);
+
+    tile.fire("click");
+
+    assert.equal(requests.length, 1);
+    assert.equal(tile.classList.contains("flippable-tile--flipped"), false);
+    assert.equal(front.getAttribute("aria-hidden"), "false");
+    assert.equal(back.getAttribute("aria-hidden"), "true");
+    assert.equal(fakeDocument.listenerCount("click"), 0);
+  });
+});
+
+test("an action failure marks only its flipped tile and outside click clears the result", async () => {
   const upstream = createDeferred();
-  await withHomeAssistantWidget(async () => upstream.promise, async ({ registration }) => {
+  await withHomeAssistantWidget(async () => upstream.promise, async ({
+    fakeDocument,
+    registration
+  }) => {
     const root = new FakeElement("section");
     registration.implementation.mount(root, {
       props: {
@@ -171,8 +218,18 @@ test("an action failure re-enables only its button and keeps the other controls 
     assert.equal(officeButton.disabled, false);
     assert.notEqual(lightsButton.disabled, true);
     assert.equal(status.textContent, "Home Assistant is unreachable.");
+    assert.equal(officeButton.classList.contains("flippable-tile--flipped"), true);
+    assert.equal(officeButton.classList.contains("severity-error"), true);
+    assert.equal(lightsButton.classList.contains("severity-error"), false);
+    assert.equal(fakeDocument.listenerCount("click"), 1);
     assert.equal(findAllByTag(root, "button").length, 2);
     assert.equal(findAllByTag(root, "a").length, 0);
+
+    fakeDocument.fire("click", { target: new FakeElement("aside") });
+
+    assert.equal(officeButton.classList.contains("flippable-tile--flipped"), false);
+    assert.equal(officeButton.classList.contains("severity-error"), false);
+    assert.equal(fakeDocument.listenerCount("click"), 0);
   });
 });
 

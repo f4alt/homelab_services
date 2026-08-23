@@ -279,7 +279,7 @@ test("time-since name flips to date-only conditional details and dismisses them"
         /\.time-since-name-button\s*{[^}]*cursor:\s*pointer;/
       );
       assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
-      assert.equal(knownTile.classList.contains("time-since-tile--flipped"), false);
+      assert.equal(knownTile.classList.contains("flippable-tile--flipped"), false);
       assert.equal(findByClass(knownTile, "time-since-tooltip"), null);
       assert.match(
         treeText(knownBack),
@@ -296,25 +296,25 @@ test("time-since name flips to date-only conditional details and dismisses them"
 
       knownNameButton.fire("click");
       assert.equal(knownNameButton.getAttribute("aria-expanded"), "true");
-      assert.equal(knownTile.classList.contains("time-since-tile--flipped"), true);
+      assert.equal(knownTile.classList.contains("flippable-tile--flipped"), true);
       assert.equal(knownBack.focusCalls, 1);
       assert.equal(fakeDocument.listenerCount("click"), 1);
       assert.equal(fakeDocument.listenerCount("keydown"), 1);
 
       knownBack.fire("click");
       assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
-      assert.equal(knownTile.classList.contains("time-since-tile--flipped"), false);
+      assert.equal(knownTile.classList.contains("flippable-tile--flipped"), false);
       assert.equal(knownNameButton.focusCalls, 1);
       assert.equal(fakeDocument.listenerCount("click"), 0);
       assert.equal(fakeDocument.listenerCount("keydown"), 0);
 
       knownTile.fire("click");
-      assert.equal(knownTile.classList.contains("time-since-tile--flipped"), false);
+      assert.equal(knownTile.classList.contains("flippable-tile--flipped"), false);
 
       knownNameButton.fire("click");
       fakeDocument.fire("click", { target: new FakeElement("aside") });
       assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
-      assert.equal(knownTile.classList.contains("time-since-tile--flipped"), false);
+      assert.equal(knownTile.classList.contains("flippable-tile--flipped"), false);
 
       knownNameButton.fire("click");
       fakeDocument.fire("keydown", { key: "Escape" });
@@ -354,7 +354,7 @@ test("resetting the day number posts the existing update contract and reloads", 
     const action = originalButton.fireAsync("click");
     const optimisticButton = findByClass(state.grid.children[0], "time-since-reset-button");
 
-    assert.equal(state.grid.children[0].classList.contains("time-since-tile--flipped"), false);
+    assert.equal(state.grid.children[0].classList.contains("flippable-tile--flipped"), false);
     assert.equal(originalButton.disabled, true);
     assert.equal(optimisticButton.disabled, true);
     assert.equal(optimisticButton.textContent, "0");
