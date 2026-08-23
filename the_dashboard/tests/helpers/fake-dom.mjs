@@ -32,8 +32,17 @@ export class FakeElement {
     this.events = new Map();
     this.focusCalls = 0;
     this.hidePopoverCalls = 0;
+    this.popoverOpen = false;
     this.showPopoverCalls = 0;
-    this.style = { setProperty() {} };
+    const styleProperties = new Map();
+    this.style = {
+      getPropertyValue(name) {
+        return styleProperties.get(name) || "";
+      },
+      setProperty(name, value) {
+        styleProperties.set(name, String(value));
+      }
+    };
     this.tagName = tagName;
     this.textContent = "";
     this.value = "";
@@ -41,9 +50,11 @@ export class FakeElement {
     if (supportsPopover) {
       this.hidePopover = () => {
         this.hidePopoverCalls += 1;
+        this.popoverOpen = false;
       };
       this.showPopover = () => {
         this.showPopoverCalls += 1;
+        this.popoverOpen = true;
       };
     }
   }
@@ -89,6 +100,7 @@ export class FakeElement {
       target: this,
       currentTarget: this,
       key: values.key,
+      propertyName: values.propertyName,
       defaultPrevented: false,
       propagationStopped: false,
       preventDefault() {
@@ -118,6 +130,14 @@ export class FakeElement {
 
   getAttribute(name) {
     return this.attributes.get(name) ?? null;
+  }
+
+  matches(selector) {
+    return selector === ":popover-open" && this.popoverOpen;
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(name);
   }
 
   setAttribute(name, value) {

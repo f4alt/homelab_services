@@ -1,13 +1,15 @@
 const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
-const POPUP_ANCHOR_PREFIX = "--dashboard-popup-anchor";
-const POPUP_ANCHOR_SUPPORT_QUERIES = Object.freeze([
-  `anchor-name: ${POPUP_ANCHOR_PREFIX}`,
-  `position-anchor: ${POPUP_ANCHOR_PREFIX}`,
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+const OVERLAY_ANCHOR_PREFIX = "--dashboard-overlay-anchor";
+const OVERLAY_ANCHOR_SUPPORT_QUERIES = Object.freeze([
+  `anchor-name: ${OVERLAY_ANCHOR_PREFIX}`,
+  `position-anchor: ${OVERLAY_ANCHOR_PREFIX}`,
   "top: anchor(top)",
   "left: anchor(50%)",
-  "width: anchor-size(width)"
+  "width: anchor-size(width)",
+  "height: anchor-size(block)"
 ]);
-let nextPopupAnchorIndex = 0;
+let nextOverlayAnchorIndex = 0;
 
 export async function fetchJson(pathOrUrl, options = {}) {
   const {
@@ -119,28 +121,117 @@ export function createTile(className = "") {
   return createElement("div", `ui-tile ${className}`.trim());
 }
 
+function demoteFlippableBack(back) {
+  if (!back.matches(":popover-open")) return;
+
+  back.hidePopover();
+}
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+function constrainFlippableBackToViewport(front, back) {
+  if (typeof front.getBoundingClientRect !== "function") return;
+
+  const frontBounds = front.getBoundingClientRect();
+  const viewportWidth = document.documentElement?.clientWidth || window.innerWidth;
+  if (
+    !Number.isFinite(frontBounds.left) ||
+    !Number.isFinite(frontBounds.width) ||
+    !Number.isFinite(viewportWidth)
+  ) {
+    return;
+  }
+
+  const frontCenter = frontBounds.left + (frontBounds.width / 2);
+  const nearestViewportEdge = Math.max(
+    0,
+    Math.min(frontCenter, viewportWidth - frontCenter)
+  );
+  const symmetricViewportWidth = nearestViewportEdge * 2;
+  const maximumWidth = Math.max(frontBounds.width, symmetricViewportWidth);
+  back.style.setProperty("--flippable-tile-max-width", `${maximumWidth}px`);
+}
+
+function promoteFlippableBack(front, back) {
+  if (!back.classList.contains("flippable-tile-face--floating")) return;
+
+  constrainFlippableBackToViewport(front, back);
+  if (back.matches(":popover-open")) return;
+
+  try {
+    back.showPopover();
+    // Commit the hidden starting face before applying the flipped transform.
+    back.getBoundingClientRect?.();
+  } catch {
+    // Top-layer positioning is an enhancement; keep the centered fallback usable.
+    back.classList.remove("flippable-tile-face--floating");
+    back.removeAttribute("popover");
+  }
+}
+
 export function setFlippableTileState({ tile, front, back }, flipped) {
+  if (flipped) promoteFlippableBack(front, back);
   tile.classList.toggle("flippable-tile--flipped", flipped);
   front.setAttribute("aria-hidden", String(flipped));
   back.setAttribute("aria-hidden", String(!flipped));
+  if (!flipped && prefersReducedMotion()) demoteFlippableBack(back);
 }
 
-function prepareFloatingPopup(trigger, popup) {
+function anchorOverlay(anchor, overlay) {
   if (
     typeof CSS === "undefined" ||
     typeof CSS.supports !== "function" ||
-    !POPUP_ANCHOR_SUPPORT_QUERIES.every((query) => CSS.supports(query)) ||
-    typeof popup.showPopover !== "function" ||
-    typeof popup.hidePopover !== "function"
+    !OVERLAY_ANCHOR_SUPPORT_QUERIES.every((query) => CSS.supports(query))
   ) {
     return false;
   }
 
-  nextPopupAnchorIndex += 1;
-  const anchorName = `${POPUP_ANCHOR_PREFIX}-${nextPopupAnchorIndex}`;
+  nextOverlayAnchorIndex += 1;
+  const anchorName = `${OVERLAY_ANCHOR_PREFIX}-${nextOverlayAnchorIndex}`;
 
-  trigger.style.setProperty("anchor-name", anchorName);
-  popup.style.setProperty("position-anchor", anchorName);
+  anchor.style.setProperty("anchor-name", anchorName);
+  overlay.style.setProperty("position-anchor", anchorName);
+  return true;
+}
+
+export function prepareFlippableTile({ tile, front, back }) {
+  if (
+    typeof back.showPopover !== "function" ||
+    typeof back.hidePopover !== "function" ||
+    !anchorOverlay(front, back)
+  ) {
+    return false;
+  }
+
+  back.setAttribute("popover", "manual");
+  back.classList.add("flippable-tile-face--floating");
+  const demoteAfterClosing = (event) => {
+    if (
+      event.target === back &&
+      event.propertyName === "transform" &&
+      !tile.classList.contains("flippable-tile--flipped")
+    ) {
+      demoteFlippableBack(back);
+    }
+  };
+  back.addEventListener("transitioncancel", demoteAfterClosing);
+  back.addEventListener("transitionend", demoteAfterClosing);
+  return true;
+}
+
+function prepareFloatingPopup(trigger, popup) {
+  if (
+    typeof popup.showPopover !== "function" ||
+    typeof popup.hidePopover !== "function" ||
+    !anchorOverlay(trigger, popup)
+  ) {
+    return false;
+  }
+
   popup.setAttribute("popover", "manual");
   popup.classList.add("popup--floating");
   return true;

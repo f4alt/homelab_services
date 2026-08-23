@@ -5,6 +5,7 @@ import {
   createResponsiveGrid,
   fetchJson,
   installWidgetStyles,
+  prepareFlippableTile,
   setFlippableTileState,
   setStateMessage
 } from "../platform/global.js";
@@ -220,6 +221,7 @@ function createTileView(state, item, nowMs) {
     resetButton,
     item
   };
+  prepareFlippableTile(tileView);
   nameButton.addEventListener("click", () => {
     setOpenTileView(state, state.openTileView === tileView ? null : tileView);
   });

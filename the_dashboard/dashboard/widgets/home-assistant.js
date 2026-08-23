@@ -6,6 +6,7 @@ import {
   createWidgetMessage,
   fetchJson,
   installWidgetStyles,
+  prepareFlippableTile,
   setFlippableTileState
 } from "../platform/global.js";
 
@@ -22,17 +23,18 @@ const HOME_ASSISTANT_STYLES = `
       text-align: center;
     }
 
-    .home-assistant-tile.severity-error {
+    .home-assistant-tile.is-error {
       border: 0 !important;
       padding: 0;
     }
 
-    .home-assistant-tile.severity-error .home-assistant-face--back {
+    .home-assistant-tile.is-error .home-assistant-face--back {
       border-color: var(--err-muted) !important;
     }
 
     .home-assistant-face {
       align-items: center;
+      color: inherit;
       display: flex;
       justify-content: center;
       overflow-wrap: anywhere;
@@ -40,7 +42,7 @@ const HOME_ASSISTANT_STYLES = `
 
     .home-assistant-tile:focus-visible .home-assistant-face--front {
       border-color: var(--clickable-hover-border);
-      box-shadow: var(--clickable-shadow, var(--shadow-surface-hover));
+      box-shadow: var(--shadow-surface-hover);
     }
 
     .home-assistant-tile:disabled {
@@ -82,7 +84,7 @@ function closeActionResult(state, restoreFocus = false) {
   if (!tileView) return;
 
   syncTileFlipState(tileView, false);
-  tileView.tile.classList.remove("severity-error");
+  tileView.tile.classList.remove("is-error");
   state.openTileView = null;
   state.resultDismissal.deactivate();
   if (restoreFocus) tileView.tile.focus();
@@ -90,7 +92,7 @@ function closeActionResult(state, restoreFocus = false) {
 
 function showActionResult(state, tileView, message, isError) {
   closeActionResult(state);
-  tileView.tile.classList.toggle("severity-error", isError);
+  tileView.tile.classList.toggle("is-error", isError);
   state.openTileView = tileView;
   syncTileFlipState(tileView, true);
   tileView.back.textContent = message;
@@ -106,18 +108,23 @@ function createActionTile(state, action) {
   const flipper = createElement("span", "flippable-tile-inner");
   const front = createElement(
     "span",
-    "clickable flippable-tile-face flippable-tile-face--front home-assistant-face home-assistant-face--front",
+    "ui-tile flippable-tile-face flippable-tile-face--front home-assistant-face home-assistant-face--front",
     action.name
   );
-  const back = createElement(
-    "span",
-    "clickable flippable-tile-face flippable-tile-face--back home-assistant-face home-assistant-face--back widget-status"
-  );
+  const back = createElement("span");
+  back.className = [
+    "ui-tile",
+    "flippable-tile-face",
+    "flippable-tile-face--back",
+    "home-assistant-face",
+    "home-assistant-face--back"
+  ].join(" ");
   back.setAttribute("aria-live", "polite");
   flipper.append(front, back);
   tile.appendChild(flipper);
 
   const tileView = { back, front, pending: false, tile };
+  prepareFlippableTile(tileView);
   syncTileFlipState(tileView, false);
 
   tile.addEventListener("click", async () => {

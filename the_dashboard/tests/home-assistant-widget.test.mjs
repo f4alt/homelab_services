@@ -32,9 +32,10 @@ function findByAttribute(element, name, value) {
 
 async function withHomeAssistantWidget(fetchImplementation, run) {
   let registration;
-  const fakeDocument = new FakeDocument();
+  const fakeDocument = new FakeDocument({ supportsPopover: true });
   const window = {
     DASH_CONFIG: { apiBase: "/api" },
+    innerWidth: 1_000,
     DASH: {
       registerWidget(type, implementation) {
         registration = { type, implementation };
@@ -43,6 +44,7 @@ async function withHomeAssistantWidget(fetchImplementation, run) {
   };
 
   await withPatchedGlobals({
+    CSS: { supports: () => true },
     document: fakeDocument,
     fetch: fetchImplementation,
     window
@@ -126,7 +128,7 @@ test("Home Assistant action tiles wrap their front content by default", async ()
   );
 });
 
-test("Home Assistant flip faces own their surfaces while the button anchors layout", async () => {
+test("Home Assistant flip faces use the shared tile surface and overlay positioning", async () => {
   await withHomeAssistantWidget(
     async () => createSuccessResponse({}),
     async ({ registration }) => {
@@ -144,8 +146,17 @@ test("Home Assistant flip faces own their surfaces while the button anchors layo
       const back = findByClass(tile, "home-assistant-face--back");
 
       assert.equal(tile.classList.contains("clickable"), false);
-      assert.equal(front.classList.contains("clickable"), true);
-      assert.equal(back.classList.contains("clickable"), true);
+      assert.equal(front.classList.contains("ui-tile"), true);
+      assert.equal(back.classList.contains("ui-tile"), true);
+      assert.equal(back.classList.contains("flippable-tile-face--floating"), true);
+      assert.equal(back.classList.contains("widget-status"), false);
+      assert.equal(back.getAttribute("popover"), "manual");
+      assert.equal(tile.style.getPropertyValue("anchor-name"), "");
+      assert.notEqual(front.style.getPropertyValue("anchor-name"), "");
+      assert.equal(
+        back.style.getPropertyValue("position-anchor"),
+        front.style.getPropertyValue("anchor-name")
+      );
     }
   );
 });
@@ -210,6 +221,7 @@ test("a completed Home Assistant action flips its tile to the result and flips b
     const tile = findByClass(root, "home-assistant-tile");
     const front = findByClass(tile, "home-assistant-face--front");
     const back = findByClass(tile, "home-assistant-face--back");
+    front.getBoundingClientRect = () => ({ left: 800, width: 100 });
 
     assert.equal(tile.classList.contains("flippable-tile--flipped"), false);
     assert.equal(front.getAttribute("aria-hidden"), "false");
@@ -222,6 +234,11 @@ test("a completed Home Assistant action flips its tile to the result and flips b
     assert.equal(front.getAttribute("aria-hidden"), "true");
     assert.equal(back.getAttribute("aria-hidden"), "false");
     assert.equal(back.textContent, "Ran Office Focus.");
+    assert.equal(back.showPopoverCalls, 1);
+    assert.equal(
+      back.style.getPropertyValue("--flippable-tile-max-width"),
+      "300px"
+    );
     assert.equal(fakeDocument.listenerCount("click"), 1);
 
     tile.fire("click");
@@ -231,6 +248,9 @@ test("a completed Home Assistant action flips its tile to the result and flips b
     assert.equal(front.getAttribute("aria-hidden"), "false");
     assert.equal(back.getAttribute("aria-hidden"), "true");
     assert.equal(fakeDocument.listenerCount("click"), 0);
+
+    back.fire("transitionend", { propertyName: "transform" });
+    assert.equal(back.hidePopoverCalls, 1);
   });
 });
 
@@ -265,8 +285,8 @@ test("an action failure marks only its flipped tile and outside click clears the
     assert.notEqual(lightsButton.disabled, true);
     assert.equal(status.textContent, "Home Assistant is unreachable.");
     assert.equal(officeButton.classList.contains("flippable-tile--flipped"), true);
-    assert.equal(officeButton.classList.contains("severity-error"), true);
-    assert.equal(lightsButton.classList.contains("severity-error"), false);
+    assert.equal(officeButton.classList.contains("is-error"), true);
+    assert.equal(lightsButton.classList.contains("is-error"), false);
     assert.equal(fakeDocument.listenerCount("click"), 1);
     assert.equal(findAllByTag(root, "button").length, 2);
     assert.equal(findAllByTag(root, "a").length, 0);
@@ -274,7 +294,7 @@ test("an action failure marks only its flipped tile and outside click clears the
     fakeDocument.fire("click", { target: new FakeElement("aside") });
 
     assert.equal(officeButton.classList.contains("flippable-tile--flipped"), false);
-    assert.equal(officeButton.classList.contains("severity-error"), false);
+    assert.equal(officeButton.classList.contains("is-error"), false);
     assert.equal(fakeDocument.listenerCount("click"), 0);
   });
 });

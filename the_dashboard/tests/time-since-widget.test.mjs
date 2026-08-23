@@ -92,7 +92,11 @@ test("time-since renders ordered tiles inside a height-capped responsive grid", 
     );
     assert.equal(
       state.grid.children.every((tile) => (
-        findByClass(tile, "time-since-face--front").classList.contains("ui-tile")
+        findByClass(tile, "time-since-face--front").classList.contains("ui-tile") &&
+        findByClass(tile, "time-since-face--back").classList.contains("ui-tile") &&
+        findByClass(tile, "time-since-face--back").classList.contains(
+          "flippable-tile-face--floating"
+        )
       )),
       true
     );
@@ -307,6 +311,7 @@ test("time-since name flips to date-only conditional details and dismisses them"
       assert.equal(knownNameButton.getAttribute("aria-expanded"), "true");
       assert.equal(knownTile.classList.contains("flippable-tile--flipped"), true);
       assert.equal(knownBack.focusCalls, 1);
+      assert.equal(knownBack.showPopoverCalls, 1);
       assert.equal(fakeDocument.listenerCount("click"), 1);
       assert.equal(fakeDocument.listenerCount("keydown"), 1);
 
@@ -316,14 +321,19 @@ test("time-since name flips to date-only conditional details and dismisses them"
       assert.equal(knownNameButton.focusCalls, 1);
       assert.equal(fakeDocument.listenerCount("click"), 0);
       assert.equal(fakeDocument.listenerCount("keydown"), 0);
+      knownBack.hidePopover();
+      assert.equal(knownBack.hidePopoverCalls, 1);
 
       knownTile.fire("click");
       assert.equal(knownTile.classList.contains("flippable-tile--flipped"), false);
 
       knownNameButton.fire("click");
+      assert.equal(knownBack.showPopoverCalls, 2);
       fakeDocument.fire("click", { target: new FakeElement("aside") });
       assert.equal(knownNameButton.getAttribute("aria-expanded"), "false");
       assert.equal(knownTile.classList.contains("flippable-tile--flipped"), false);
+      knownBack.fire("transitionend", { propertyName: "transform" });
+      assert.equal(knownBack.hidePopoverCalls, 2);
 
       knownNameButton.fire("click");
       fakeDocument.fire("keydown", { key: "Escape" });

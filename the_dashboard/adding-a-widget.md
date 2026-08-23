@@ -64,6 +64,8 @@ Current reusable JavaScript primitives include:
 - `createTile()` for the standard tile surface, with controlled
   `--tile-padding`, `--tile-radius`, and `--tile-box-shadow` overrides
 - `setFlippableTileState()` for the shared flip class and front/back ARIA state
+- `prepareFlippableTile()` for centered, viewport-anchored reverse faces when
+  CSS anchor positioning is available
 - `createDismissibleMenu()` for per-instance popup state, ARIA expansion,
   temporary outside-click/Escape listeners, and focus return
 - `bindHoverPopup()` for hover/focus tooltip state and top-layer positioning
@@ -75,9 +77,9 @@ the standard `label`, `label-info`, and `value-large` typography. Tiled lists
 fit their children by default; use `list-fullWidth` when each child should fill
 the available width and the vertical stack should claim the remaining widget
 space. A `flippable-tile` wrapper takes its normal size from the front face;
-give both faces their own `clickable` or `ui-tile` surface. The absolutely
-positioned back face can then grow over neighboring tiles without changing the
-list layout.
+give both faces the same `ui-tile` surface. The centered back face is never
+smaller than the front and can grow over neighboring tiles without changing
+the list layout or adding horizontal overflow.
 
 ## Frontend Contract
 
@@ -228,8 +230,9 @@ Enable the widget in the selected dashboard config. Use
   and `createTile()` for ordinary tile surfaces. A custom surface should be
   justified by genuinely different semantics or layout.
 - Keep `flippable-tile` wrappers surface-free. Apply the appropriate surface
-  class to each face so the in-flow front reserves the closed size and the
-  content-sized back can overlay it when open.
+  class to each face, call `prepareFlippableTile()`, and let the in-flow front
+  reserve the closed size. The content-sized back uses a centered absolute
+  fallback and a viewport anchor in supported browsers.
 - Override a standard tile only through `--tile-padding`, `--tile-radius`, and
   `--tile-box-shadow`. Keep data layout, field grouping, and domain-state
   effects in the widget.
