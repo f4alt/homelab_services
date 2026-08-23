@@ -182,7 +182,7 @@ test("status preserves an explicitly disabled destination after provider results
 
       assert.equal(tile.link.getAttribute("href"), null);
       assert.equal(tile.link.classList.contains("clickable"), false);
-      assert.equal(tile.link.classList.contains("ui-tile"), true);
+      assert.equal(tile.link.classList.contains("ui-tile"), false);
     }
   );
 });
@@ -237,7 +237,7 @@ test("status renders ordered duplicate checks and applies normalized results by 
   );
 });
 
-test("status renders the representative provider matrix with consistent tile surfaces", async () => {
+test("status renders the representative provider matrix as consistent instrument lines", async () => {
   const scenarios = [
     {
       check: {
@@ -352,7 +352,7 @@ test("status renders the representative provider matrix with consistent tile sur
 
       for (const [index, tile] of state.tiles.entries()) {
         const configuredHref = scenarios[index].check.href || null;
-        assert.equal(tile.link.classList.contains("ui-tile"), true);
+        assert.equal(tile.link.classList.contains("ui-tile"), false);
         assert.equal(tile.link.classList.contains("clickable"), Boolean(configuredHref));
         assert.equal(tile.link.getAttribute("href"), configuredHref);
       }
@@ -374,7 +374,7 @@ test("status renders the representative provider matrix with consistent tile sur
 
         assert.equal(icons.length, 1, scenario.check.name);
         const [icon] = icons;
-        assert.equal(tile.link.classList.contains("ui-tile"), true, scenario.check.name);
+        assert.equal(tile.link.classList.contains("ui-tile"), false, scenario.check.name);
         assert.equal(
           tile.link.classList.contains("clickable"),
           Boolean(expectedHref),
@@ -433,7 +433,7 @@ test("status preserves the last successful results when a whole refresh fails", 
 
       assert.equal(tile.dot.classList.contains("dot--warn"), true);
       assert.equal(tile.popup.textContent, "Workflow running.");
-      assert.equal(tile.link.classList.contains("ui-tile"), true);
+      assert.equal(tile.link.classList.contains("ui-tile"), false);
       assert.equal(tile.link.classList.contains("clickable"), false);
       assert.equal(tile.link.getAttribute("href"), null);
       assert.equal(tile.link.getAttribute("target"), null);

@@ -20,12 +20,18 @@ test("clickable surfaces accept widget-specific background and border tokens", a
   );
 });
 
-test("status tile links preserve their neutral tile surface when interactive", async () => {
+test("status entries use open instrument lines instead of ui tiles", async () => {
   const source = await statusWidget;
 
   assert.match(
     source,
-    /\.status-tile-shell\s*{[^}]*--clickable-background:\s*var\(--tile\);[^}]*--clickable-border:\s*var\(--tile-border\);/s
+    /\.status-tile-shell\s*{[^}]*--clickable-background:\s*transparent;[^}]*--clickable-border:\s*transparent;/s
   );
-  assert.match(source, /link\.className\s*=\s*"ui-tile status-tile-shell";/);
+  assert.match(
+    source,
+    /\.status-tile::after\s*{[^}]*background:\s*var\(--status-line-color\);[^}]*grid-area:\s*line;/s
+  );
+  assert.match(source, /createResponsiveGrid\(props,\s*"status-list"\)/);
+  assert.match(source, /link\.className\s*=\s*"status-tile-shell";/);
+  assert.doesNotMatch(source, /link\.className\s*=\s*"[^"\n]*ui-tile/);
 });

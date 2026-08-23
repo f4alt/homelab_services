@@ -21,26 +21,73 @@ const INDICATOR_CLASSES = Object.freeze({
   other: "dot--warn"
 });
 const STATUS_STYLES = `
+    .status-list {
+      --status-line-min-width: var(--tile-min, 12rem);
+
+      display: grid;
+      gap: var(--gap);
+      grid-template-columns: repeat(
+        auto-fit,
+        minmax(min(100%, var(--status-line-min-width)), 1fr)
+      );
+    }
+
     .status-tile-shell {
-      --clickable-background: var(--tile);
-      --clickable-border: var(--tile-border);
-      --clickable-padding: var(--tile-padding, var(--widget-padding));
-      --clickable-radius: var(--tile-radius, var(--radius));
+      --clickable-background: transparent;
+      --clickable-border: transparent;
+      --clickable-padding: var(--space-sm) 0;
+      --clickable-radius: 0;
+      --clickable-shadow: none;
+      --status-line-color: var(--card-border);
+      --status-line-width: 1px;
+
       color: inherit;
       display: block;
+      padding: var(--clickable-padding);
       text-decoration: none;
+    }
+
+    .status-tile-shell.clickable {
+      border: 0;
     }
 
     .status-tile {
       align-items: center;
       display: grid;
       gap: var(--space-sm) var(--space-control);
-      grid-template-columns: auto auto 1fr;
+      grid-template-areas: "icon name line status";
+      grid-template-columns:
+        auto
+        minmax(0, max-content)
+        minmax(var(--space-md), 1fr)
+        auto;
+    }
+
+    .status-tile::after {
+      background: var(--status-line-color);
+      content: "";
+      grid-area: line;
+      height: var(--status-line-width);
+      transition: background-color .15s ease;
+    }
+
+    .status-tile > .icon {
+      grid-area: icon;
+    }
+
+    .status-tile > .label {
+      grid-area: name;
+    }
+
+    .status-tile-shell.clickable:is(:hover, :focus-visible) .status-tile::after {
+      background: var(--clickable-hover-border);
     }
 
     .status-popup-target {
       --dot-size: 16px;
-      --popup-transform: translate(-20%, -90%);
+      --popup-transform: translate(-80%, -90%);
+
+      grid-area: status;
     }
 
     .status-refresh-warning {
@@ -108,7 +155,7 @@ function createStyledIcon(icon, checkName) {
 
 function createStatusTile(check) {
   const link = document.createElement("a");
-  link.className = "ui-tile status-tile-shell";
+  link.className = "status-tile-shell";
   const tile = createElement("div", "status-tile");
   const dotWrap = createElement("div", "popup-on-hover status-popup-target");
   const dot = createElement("div", "dot");
@@ -194,7 +241,7 @@ window.DASH.registerWidget("status", {
     const configuredChecks = Array.isArray(props.checks) ? props.checks : [];
     const checks = configuredChecks.filter(validCheck).map(normalizeCheck);
     const invalidCheckCount = configuredChecks.length - checks.length;
-    const grid = createResponsiveGrid(props);
+    const grid = createResponsiveGrid(props, "status-list");
     const warning = createElement("div", "label-info status-refresh-warning widget-status");
     warning.setAttribute("role", "status");
     warning.setAttribute("aria-live", "polite");
