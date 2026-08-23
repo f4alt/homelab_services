@@ -1,10 +1,12 @@
+import logging
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from api import create_app
+from api import create_app, run_server
 
 
 class InventoryApiTest(unittest.TestCase):
@@ -55,6 +57,18 @@ class InventoryApiTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse(os.path.exists(configured_db_path))
+
+    def test_server_suppresses_routine_access_logs(self):
+        with (
+            patch("api.create_app") as create_app_mock,
+            patch("api.logging.getLogger") as get_logger,
+            patch.dict(os.environ, {"API_PORT": "5100"}),
+        ):
+            run_server()
+
+        get_logger.assert_called_once_with("werkzeug")
+        get_logger.return_value.setLevel.assert_called_once_with(logging.WARNING)
+        create_app_mock.return_value.run.assert_called_once_with(host="0.0.0.0", port=5100)
 
     def test_create_get_list_update_delete_item(self):
         create_response = self.create_item()

@@ -1,4 +1,5 @@
 import argparse
+import logging
 import time
 import traceback
 
@@ -13,7 +14,8 @@ def run_sync(args):
     while True:
         try:
             result = service.run_once()
-            print(f"Synced {result.task_count} todos [{result.synced_at.isoformat()}]", flush=True)
+            if not args.watch:
+                print(f"Synced {result.task_count} todos [{result.synced_at.isoformat()}]", flush=True)
         except Exception:
             if not args.watch:
                 raise
@@ -27,6 +29,7 @@ def run_sync(args):
 def run_server(args):
     from .api import create_app
 
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
     settings = Settings.from_env(args.env_file)
     app = create_app(settings)
     app.run(host=settings.api_host, port=settings.api_port, debug=args.debug)

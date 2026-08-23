@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import sqlite3
 from contextlib import closing
@@ -288,6 +289,11 @@ def search_items(items, query):
     return matches
 
 
-if __name__ == "__main__":
+def run_server():
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
     app = create_app()
     app.run(host="0.0.0.0", port=int(os.environ.get("API_PORT", "5000")))
+
+
+if __name__ == "__main__":
+    run_server()

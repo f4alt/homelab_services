@@ -15,3 +15,6 @@ type = owner_only
 [storage]
 type = multifilesystem
 filesystem_folder = /data/collections
+
+[logging]
+level = warning
