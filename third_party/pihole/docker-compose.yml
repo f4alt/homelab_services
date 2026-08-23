@@ -17,6 +17,10 @@ services:
       TZ: "${PIHOLE_TIME_ZONE:-America/Chicago}"
       FTLCONF_webserver_api_password: "${PIHOLE_WEB_PASSWORD:?Set PIHOLE_WEB_PASSWORD in .env before starting Pi-hole}"
       FTLCONF_dns_listeningMode: "${PIHOLE_DNS_LISTENING_MODE:-ALL}"
+      # Keep in-memory/query-database history without duplicating every query to a text log.
+      FTLCONF_dns_queryLogging: "${PIHOLE_QUERY_LOGGING:-false}"
+      # Batch durable query history; an abrupt outage can lose at most five minutes.
+      FTLCONF_database_DBinterval: "${PIHOLE_DATABASE_WRITE_INTERVAL_SECONDS:-300}"
     volumes:
       - "${PIHOLE_CONFIG_HOST_PATH:-./config}:/etc/pihole"
     logging: *service-logging
