@@ -82,6 +82,7 @@ test("tracked dashboard config includes the public BRL-CAD Actions check", async
     provider: { ...check.provider }
   })), [{
     name: "BRL-CAD CI",
+    icon: "/icons/github.svg",
     href: "https://github.com/BRL-CAD/brlcad/actions",
     provider: {
       type: "github-actions",

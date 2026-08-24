@@ -75,10 +75,10 @@ Important environment knobs are documented in `.env.example`, including:
 Status checks treat exact `localhost`, `127.0.0.1`, and `::1` targets as ports
 published by the Docker host while preserving those browser-facing URLs. Add
 LAN or external hosts and patterns to `STATUS_PROBE_ALLOWED_HOSTS` only when a
-widget needs them. Each status tile configures a provider under `props.checks`
-and may set a browser-facing `href` to make the tile interactive before its
+widget needs them. Each status entry configures a provider under `props.checks`
+and may set a browser-facing `href` to make the entry interactive before its
 first result. When omitted, the provider result may supply the destination
-instead; set `href: null` to keep the tile deliberately non-interactive. For
+instead; set `href: null` to keep the entry deliberately non-interactive. For
 example:
 
 ```js
@@ -89,6 +89,10 @@ example:
   provider: { type: "http", url: "192.168.1.1" }
 }
 ```
+
+Status icons accept emoji or text, a root-relative image path, or an HTTP(S)
+image URL. Reusable image icons live in `dashboard/icons` and can be configured
+with paths such as `icon: "/icons/github.svg"`.
 
 The Gateway currently supports HTTP probes and GitHub Actions workflow runs.
 Public GitHub repositories work without credentials. Set the optional
